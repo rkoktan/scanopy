@@ -1,97 +1,73 @@
-use crate::server::auth::middleware::auth::AuthenticatedUser;
 use crate::server::auth::middleware::permissions::RequireAdmin;
-use crate::server::shared::handlers::traits::{
-    BulkDeleteResponse, CrudHandlers, bulk_delete_handler, create_handler, delete_handler,
-    get_by_id_handler, update_handler,
-};
+use crate::server::shared::handlers::traits::create_handler;
 use crate::server::shared::services::traits::CrudService;
 use crate::server::shared::storage::filter::EntityFilter;
-use crate::server::shared::storage::traits::StorableEntity;
-use crate::server::shared::types::api::ApiError;
+use crate::server::shared::types::api::{ApiError, ApiErrorResponse};
 use crate::server::tags::r#impl::base::Tag;
 use crate::server::{
     config::AppState,
     shared::types::api::{ApiResponse, ApiResult},
 };
-use axum::extract::Path;
-use axum::routing::{delete, get, post, put};
-use axum::{Router, extract::State, response::Json};
+use axum::{extract::State, response::Json};
 use std::sync::Arc;
-use uuid::Uuid;
+use utoipa_axum::{router::OpenApiRouter, routes};
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", post(create_tag))
-        .route("/", get(get_all_tags))
-        .route("/{id}", put(update_tag))
-        .route("/{id}", delete(delete_tag))
-        .route("/{id}", get(get_by_id_handler::<Tag>))
-        .route("/bulk-delete", post(bulk_delete_tag))
+// Generated handlers for most CRUD operations
+mod generated {
+    use super::*;
+    crate::crud_get_by_id_handler!(Tag, "tags", "tag");
+    crate::crud_update_handler!(Tag, "tags", "tag");
+    crate::crud_delete_handler!(Tag, "tags", "tag");
+    crate::crud_bulk_delete_handler!(Tag, "tags");
+    crate::crud_get_all_handler!(Tag, "tags", "tag");
 }
 
-pub async fn get_all_tags(
-    State(state): State<Arc<AppState>>,
-    user: AuthenticatedUser,
-) -> ApiResult<Json<ApiResponse<Vec<Tag>>>> {
-    let organization_filter = EntityFilter::unfiltered().organization_id(&user.organization_id);
-
-    let service = Tag::get_service(&state);
-    let entities = service.get_all(organization_filter).await.map_err(|e| {
-        tracing::error!(
-            entity_type = Tag::table_name(),
-            user_id = %user.user_id,
-            error = %e,
-            "Failed to fetch entities"
-        );
-        ApiError::internal_error(&e.to_string())
-    })?;
-
-    Ok(Json(ApiResponse::success(entities)))
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(generated::get_all, create_tag))
+        .routes(routes!(
+            generated::get_by_id,
+            generated::update,
+            generated::delete
+        ))
+        .routes(routes!(generated::bulk_delete))
 }
 
+/// Create a new tag
+///
+/// Creates a tag scoped to your organization. Tag names must be unique within the organization.
+///
+/// ### Validation
+///
+/// - Name must be 1-100 characters (empty names are rejected)
+/// - Name must be unique within your organization
+#[utoipa::path(
+    post,
+    path = "",
+    tag = "tags",
+    request_body = Tag,
+    responses(
+        (status = 200, description = "Tag created successfully", body = ApiResponse<Tag>),
+        (status = 400, description = "Validation error: name empty or too long", body = ApiErrorResponse),
+        (status = 409, description = "Tag name already exists in this organization", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn create_tag(
     state: State<Arc<AppState>>,
-    admin: RequireAdmin,
-    json: Json<Tag>,
+    RequireAdmin(user): RequireAdmin,
+    Json(tag): Json<Tag>,
 ) -> ApiResult<Json<ApiResponse<Tag>>> {
-    let created = create_handler::<Tag>(state, admin.into(), json.clone()).await;
+    let name_filter = EntityFilter::unfiltered()
+        .organization_id(&user.organization_id)
+        .name(tag.base.name.clone());
 
-    match created {
-        Ok(c) => Ok(c),
-        Err(e)
-            if e.message
-                .contains("violates unique constraint \"idx_tags_org_name\"") =>
-        {
-            Err(ApiError::conflict(&format!(
-                "Tag names must be unique; a tag named \"{}\" already exists",
-                json.base.name
-            )))
-        }
-        Err(e) => Err(e),
+    if let Some(existing_with_name) = state.services.tag_service.get_one(name_filter).await? {
+        return Err(ApiError::conflict(&format!(
+            "Tag names must be unique; a tag named \"{}\" already exists",
+            existing_with_name.base.name
+        )));
     }
-}
 
-pub async fn delete_tag(
-    state: State<Arc<AppState>>,
-    admin: RequireAdmin,
-    id: Path<Uuid>,
-) -> ApiResult<Json<ApiResponse<()>>> {
-    delete_handler::<Tag>(state, admin.into(), id).await
-}
-
-pub async fn update_tag(
-    state: State<Arc<AppState>>,
-    admin: RequireAdmin,
-    id: Path<Uuid>,
-    json: Json<Tag>,
-) -> ApiResult<Json<ApiResponse<Tag>>> {
-    update_handler::<Tag>(state, admin.into(), id, json).await
-}
-
-pub async fn bulk_delete_tag(
-    state: State<Arc<AppState>>,
-    admin: RequireAdmin,
-    json: Json<Vec<Uuid>>,
-) -> ApiResult<Json<ApiResponse<BulkDeleteResponse>>> {
-    bulk_delete_handler::<Tag>(state, admin.into(), json).await
+    create_handler::<Tag>(state, RequireAdmin(user).into(), Json(tag)).await
 }

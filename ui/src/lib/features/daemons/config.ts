@@ -1,6 +1,12 @@
-import { max, min, required } from 'svelte-forms/validators';
-import { ipAddress, maxLength, portRange } from '$lib/shared/components/forms/validators';
-import type { Validator } from 'svelte-forms';
+import {
+	portRangeValidation,
+	required,
+	max,
+	ipAddressFormat,
+	min,
+	url,
+	type Validator
+} from '$lib/shared/components/forms/validators';
 
 interface FieldDef {
 	id: string;
@@ -27,7 +33,7 @@ export const fieldDefs: FieldDef[] = [
 		envVar: 'SCANOPY_NAME',
 		helpText: 'Name for this daemon',
 		placeholder: 'Enter a name for this daemon...',
-		validators: [required(), maxLength(100)],
+		validators: [required, max(100)],
 		required: true
 	},
 	{
@@ -55,7 +61,7 @@ export const fieldDefs: FieldDef[] = [
 		envVar: 'SCANOPY_DAEMON_PORT',
 		helpText: 'Port for daemon to listen on',
 		section: 'Network',
-		validators: [portRange()]
+		validators: [portRangeValidation]
 	},
 	{
 		id: 'bindAddress',
@@ -67,7 +73,7 @@ export const fieldDefs: FieldDef[] = [
 		helpText: 'IP address to bind daemon to',
 		placeholder: '0.0.0.0',
 		section: 'Network',
-		validators: [ipAddress()]
+		validators: [ipAddressFormat]
 	},
 	{
 		id: 'daemonUrl',
@@ -80,7 +86,7 @@ export const fieldDefs: FieldDef[] = [
 			'Public URL where server can reach daemon, if running in Push mode. Defaults to auto-detected IP + Daemon Port if not set',
 		placeholder: 'https://daemon.example.com',
 		section: 'Network',
-		validators: []
+		validators: [url]
 	},
 	{
 		id: 'allowSelfSignedCerts',
@@ -144,7 +150,7 @@ export const fieldDefs: FieldDef[] = [
 			'Optional proxy for Docker API. Can use both non-SSL and SSL proxy; SSL proxy requires additional SSL config vars',
 		placeholder: 'http://localhost:80/',
 		section: 'Docker Proxy',
-		validators: []
+		validators: [url]
 	},
 	{
 		id: 'dockerProxySslCert',

@@ -95,6 +95,56 @@ impl EntityFilter {
         self
     }
 
+    pub fn subnet_id(mut self, id: &Uuid) -> Self {
+        self.conditions
+            .push(format!("subnet_id = ${}", self.values.len() + 1));
+        self.values.push(SqlValue::Uuid(*id));
+        self
+    }
+
+    pub fn name(mut self, name: String) -> Self {
+        self.conditions
+            .push(format!("name = ${}", self.values.len() + 1));
+        self.values.push(SqlValue::String(name));
+        self
+    }
+
+    pub fn group_id(mut self, id: &Uuid) -> Self {
+        self.conditions
+            .push(format!("group_id = ${}", self.values.len() + 1));
+        self.values.push(SqlValue::Uuid(*id));
+        self
+    }
+
+    pub fn group_ids(mut self, ids: &[Uuid]) -> Self {
+        if ids.is_empty() {
+            self.conditions.push("FALSE".to_string());
+            return self;
+        }
+
+        let placeholders: Vec<String> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("${}", self.values.len() + i + 1))
+            .collect();
+
+        self.conditions
+            .push(format!("group_id IN ({})", placeholders.join(", ")));
+
+        for id in ids {
+            self.values.push(SqlValue::Uuid(*id));
+        }
+
+        self
+    }
+
+    pub fn binding_id(mut self, id: &Uuid) -> Self {
+        self.conditions
+            .push(format!("binding_id = ${}", self.values.len() + 1));
+        self.values.push(SqlValue::Uuid(*id));
+        self
+    }
+
     pub fn host_ids(mut self, ids: &[Uuid]) -> Self {
         if ids.is_empty() {
             // Empty IN clause should match nothing
@@ -122,15 +172,6 @@ impl EntityFilter {
         self.conditions
             .push(format!("key = ${}", self.values.len() + 1));
         self.values.push(SqlValue::String(api_key));
-        self
-    }
-
-    pub fn service_binding_id(mut self, id: &Uuid) -> Self {
-        self.conditions.push(format!(
-            "EXISTS (SELECT 1 FROM jsonb_array_elements(bindings) AS b WHERE b->>'id' = ${})",
-            self.values.len() + 1
-        ));
-        self.values.push(SqlValue::String(id.to_string()));
         self
     }
 
@@ -183,6 +224,47 @@ impl EntityFilter {
         self.conditions
             .push(format!("expires_at < ${}", self.values.len() + 1));
         self.values.push(SqlValue::Timestamp(timestamp));
+        self
+    }
+
+    /// Generic UUID filter for any column name.
+    /// Used by generic child entity handlers to filter by parent_column dynamically.
+    pub fn uuid_column(mut self, column: &str, id: &Uuid) -> Self {
+        self.conditions
+            .push(format!("{} = ${}", column, self.values.len() + 1));
+        self.values.push(SqlValue::Uuid(*id));
+        self
+    }
+
+    /// Generic UUID IN filter for any column name.
+    /// Used by generic child entity services to filter by parent_column dynamically.
+    pub fn uuid_columns(mut self, column: &str, ids: &[Uuid]) -> Self {
+        if ids.is_empty() {
+            self.conditions.push("FALSE".to_string());
+            return self;
+        }
+
+        let placeholders: Vec<String> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("${}", self.values.len() + i + 1))
+            .collect();
+
+        self.conditions
+            .push(format!("{} IN ({})", column, placeholders.join(", ")));
+
+        for id in ids {
+            self.values.push(SqlValue::Uuid(*id));
+        }
+
+        self
+    }
+
+    /// Filter by service_id (for bindings)
+    pub fn service_id(mut self, id: &Uuid) -> Self {
+        self.conditions
+            .push(format!("service_id = ${}", self.values.len() + 1));
+        self.values.push(SqlValue::Uuid(*id));
         self
     }
 

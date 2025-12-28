@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::server::shared::entities::ChangeTriggersTopologyStaleness;
+use crate::server::shared::types::Color;
 use crate::server::shared::types::entities::EntitySource;
 use crate::server::topology::types::edges::EdgeStyle;
 use crate::server::{
@@ -8,10 +9,13 @@ use crate::server::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Debug, Clone, Serialize, Validate, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Serialize, Validate, Deserialize, PartialEq, Eq, Hash, Default, ToSchema,
+)]
 pub struct GroupBase {
     #[validate(length(min = 0, max = 100))]
     pub name: String,
@@ -19,22 +23,40 @@ pub struct GroupBase {
     #[serde(deserialize_with = "deserialize_empty_string_as_none")]
     #[validate(length(min = 0, max = 500))]
     pub description: Option<String>,
-    #[serde(flatten)]
     pub group_type: GroupType,
-    pub source: EntitySource,
-    pub color: String,
+    /// Ordered list of binding IDs for this group.
     #[serde(default)]
+    #[schema(required)]
+    pub binding_ids: Vec<Uuid>,
+    #[serde(default)]
+    #[schema(read_only)]
+    /// Will be automatically set to Manual for creation through API
+    pub source: EntitySource,
+    pub color: Color,
+    #[serde(default)]
+    #[schema(required)]
     pub edge_style: EdgeStyle,
     #[serde(default)]
+    #[schema(required)]
     pub tags: Vec<Uuid>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default, ToSchema, Validate,
+)]
+#[schema(example = crate::server::shared::types::examples::group)]
 pub struct Group {
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub id: Uuid,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub updated_at: DateTime<Utc>,
     #[serde(flatten)]
+    #[validate(nested)]
     pub base: GroupBase,
 }
 
@@ -46,10 +68,7 @@ impl Display for Group {
 
 impl Group {
     pub fn bindings(&self) -> Vec<Uuid> {
-        match &self.base.group_type {
-            GroupType::HubAndSpoke { service_bindings } => service_bindings.to_vec(),
-            GroupType::RequestPath { service_bindings } => service_bindings.to_vec(),
-        }
+        self.base.binding_ids.clone()
     }
 }
 

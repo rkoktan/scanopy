@@ -1,13 +1,39 @@
 <script lang="ts">
 	import { Edit, Eye, Replace, Trash2 } from 'lucide-svelte';
-	import { formatInterface, getHostTargetString, hosts } from '../store';
+	import { formatInterface } from '../queries';
 	import type { Host } from '../types/base';
 	import GenericCard from '$lib/shared/components/data/GenericCard.svelte';
 	import { concepts, entities, serviceDefinitions } from '$lib/shared/stores/metadata';
 	import type { Group } from '$lib/features/groups/types/base';
-	import { getServiceById, getServicesForHost } from '$lib/features/services/store';
-	import { daemons } from '$lib/features/daemons/store';
-	import { tags } from '$lib/features/tags/store';
+	import { useTagsQuery } from '$lib/features/tags/queries';
+	import { toColor } from '$lib/shared/utils/styling';
+	import { useHostsQuery } from '../queries';
+	import { useServicesQuery } from '$lib/features/services/queries';
+	import { useInterfacesQuery } from '$lib/features/interfaces/queries';
+	import { useDaemonsQuery } from '$lib/features/daemons/queries';
+	import { useSubnetsQuery, isContainerSubnet } from '$lib/features/subnets/queries';
+
+	// Queries
+	const tagsQuery = useTagsQuery();
+	const hostsQuery = useHostsQuery();
+	const servicesQuery = useServicesQuery();
+	const interfacesQuery = useInterfacesQuery();
+	const daemonsQuery = useDaemonsQuery();
+	const subnetsQuery = useSubnetsQuery();
+
+	// Derived data
+	let tagsData = $derived(tagsQuery.data ?? []);
+	let hostsData = $derived(hostsQuery.data ?? []);
+	let servicesData = $derived(servicesQuery.data ?? []);
+	let interfacesData = $derived(interfacesQuery.data ?? []);
+	let daemonsData = $derived(daemonsQuery.data ?? []);
+	let subnetsData = $derived(subnetsQuery.data ?? []);
+
+	// Helper to check if subnet is a container subnet
+	let isContainerSubnetFn = $derived((subnetId: string) => {
+		const subnet = subnetsData.find((s) => s.id === subnetId);
+		return subnet ? isContainerSubnet(subnet) : false;
+	});
 
 	let {
 		host,
@@ -31,21 +57,19 @@
 		onSelectionChange?: (selected: boolean) => void;
 	} = $props();
 
-	let hasDaemon = $derived($daemons.some((d) => d.host_id == host.id));
+	let hasDaemon = $derived(daemonsData.some((d) => d.host_id == host.id));
 
-	// Get stores at top level
-	let hostServicesStore = $derived(getServicesForHost(host.id));
-	let hostTargetStringStore = $derived(getHostTargetString(host));
-	let virtualizationServiceStore = $derived(
-		host.virtualization !== null ? getServiceById(host.virtualization.details.service_id) : null
+	// Get filtered data for this host
+	let hostServices = $derived(servicesData.filter((s) => s.host_id === host.id));
+	let hostInterfaces = $derived(interfacesData.filter((i) => i.host_id === host.id));
+	let virtualizationService = $derived(
+		host.virtualization
+			? servicesData.find((s) => s.id === host.virtualization?.details.service_id)
+			: null
 	);
 
 	// Consolidate all reactive computations into a single derived to prevent cascading updates
 	let cardData = $derived.by(() => {
-		const hostServices = $hostServicesStore;
-		const hostTargetString = $hostTargetStringStore;
-		const virtualizationService = virtualizationServiceStore ? $virtualizationServiceStore : null;
-
 		const servicesThatManageVmsIds = hostServices
 			.filter(
 				(sv) =>
@@ -62,7 +86,7 @@
 			)
 			.map((sv) => sv.id);
 
-		const vms = $hosts.filter(
+		const vms = hostsData.filter(
 			(h) =>
 				h.virtualization &&
 				h.virtualization?.type == 'Proxmox' &&
@@ -85,7 +109,7 @@
 						subtitle: 'VM Managed By ' + virtualizationService.name || 'Unknown Service'
 					}
 				: {}),
-			link: host.target.type != 'None' ? `http://${hostTargetString}` : undefined,
+			link: host.hostname ? `http://${host.hostname}` : undefined,
 			iconColor: entities.getColorHelper('Host').icon,
 			Icon:
 				serviceDefinitions.getIconComponent(hostServices[0]?.service_definition) ||
@@ -100,7 +124,7 @@
 					value: hostGroups.map((group: Group) => ({
 						id: group.id,
 						label: group.name,
-						color: entities.getColorHelper('Group').string
+						color: entities.getColorHelper('Group').color
 					})),
 					emptyText: 'No groups assigned'
 				},
@@ -110,7 +134,7 @@
 						return {
 							id: h.id,
 							label: h.name,
-							color: concepts.getColorHelper('Virtualization').string
+							color: concepts.getColorHelper('Virtualization').color
 						};
 					}),
 					emptyText: 'No VMs assigned'
@@ -123,7 +147,7 @@
 							return {
 								id: sv.id,
 								label: sv.name,
-								color: entities.getColorHelper('Service').string
+								color: entities.getColorHelper('Service').color
 							};
 						})
 						.sort((a) => (containerIds.includes(a.id) ? 1 : -1)),
@@ -136,7 +160,7 @@
 							return {
 								id: c.id,
 								label: c.name,
-								color: concepts.getColorHelper('Virtualization').string
+								color: concepts.getColorHelper('Virtualization').color
 							};
 						})
 						.sort((a) => (containerIds.includes(a.id) ? 1 : -1)),
@@ -144,11 +168,11 @@
 				},
 				{
 					label: 'Interfaces',
-					value: host.interfaces.map((i) => {
+					value: hostInterfaces.map((i) => {
 						return {
 							id: i.id,
-							label: formatInterface(i),
-							color: entities.getColorHelper('Interface').string
+							label: formatInterface(i, isContainerSubnetFn),
+							color: entities.getColorHelper('Interface').color
 						};
 					}),
 					emptyText: 'No interfaces'
@@ -156,10 +180,10 @@
 				{
 					label: 'Tags',
 					value: host.tags.map((t) => {
-						const tag = $tags.find((tag) => tag.id == t);
+						const tag = tagsData.find((tag) => tag.id == t);
 						return tag
 							? { id: tag.id, color: tag.color, label: tag.name }
-							: { id: t, color: 'gray', label: 'Unknown Tag' };
+							: { id: t, color: toColor('gray'), label: 'Unknown Tag' };
 					})
 				}
 			],

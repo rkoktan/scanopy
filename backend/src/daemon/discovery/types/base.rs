@@ -2,9 +2,10 @@ use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Hash, ToSchema)]
 pub enum DiscoveryPhase {
     Pending, // Initial state, set by server; all subsequent states until Finished are set by Daemon
     Starting,

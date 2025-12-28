@@ -17,6 +17,7 @@ use crate::server::{
         middleware::auth::AuthenticatedEntity,
         service::AuthService,
     },
+    config::DeploymentType,
     shared::{
         events::{
             bus::EventBus,
@@ -101,6 +102,7 @@ impl OidcService {
             code,
             billing_enabled,
             terms_accepted_at,
+            deployment_type,
         } = oidc_register_params;
 
         let provider = self
@@ -141,7 +143,7 @@ impl OidcService {
             Ok::<EmailAddress, Error>(EmailAddress::new_unchecked(fallback_email_str))
         })?;
 
-        if is_email_unwanted(email.as_str()) && email.domain() != "gmx.net" {
+        if is_email_unwanted(email.as_str()) && deployment_type == DeploymentType::Cloud {
             return Err(anyhow!(
                 "Email address uses a disposable domain. Please register with a non-disposable email address."
             ));

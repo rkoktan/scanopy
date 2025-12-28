@@ -1,11 +1,15 @@
 use crate::server::{
     billing::types::features::Feature,
-    shared::types::metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    shared::types::{
+        Color, Icon,
+        metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use stripe_product::price::CreatePriceRecurringInterval;
 use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
+use utoipa::ToSchema;
 
 #[derive(
     Debug,
@@ -18,6 +22,7 @@ use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
     EnumIter,
     EnumDiscriminants,
     Eq,
+    ToSchema,
 )]
 #[strum_discriminants(derive(IntoStaticStr, Serialize))]
 #[serde(tag = "type")]
@@ -97,7 +102,7 @@ impl BillingPlan {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Default, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Default, Hash, ToSchema)]
 pub struct PlanConfig {
     pub base_cents: i64,
     pub rate: BillingRate,
@@ -120,7 +125,9 @@ pub enum Hosting {
     Cloud,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Display, Default, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Display, Default, Copy, PartialEq, Eq, Hash, ToSchema,
+)]
 pub enum BillingRate {
     #[default]
     Month,
@@ -142,6 +149,7 @@ pub struct BillingPlanFeatures {
     pub remove_created_with: bool,
     pub audit_logs: bool,
     pub webhooks: bool,
+    pub api_access: bool,
     pub onboarding_call: bool,
     pub commercial_license: bool,
     pub custom_sso: bool,
@@ -262,6 +270,7 @@ impl BillingPlan {
                 audit_logs: false,
                 commercial_license: false,
                 remove_created_with: false,
+                api_access: true,
                 custom_sso: false,
                 managed_deployment: false,
                 whitelabeling: false,
@@ -279,6 +288,7 @@ impl BillingPlan {
                 audit_logs: false,
                 remove_created_with: true,
                 custom_sso: false,
+                api_access: false,
                 managed_deployment: false,
                 whitelabeling: false,
                 live_chat_support: false,
@@ -294,6 +304,7 @@ impl BillingPlan {
                 webhooks: false,
                 audit_logs: false,
                 remove_created_with: true,
+                api_access: true,
                 custom_sso: false,
                 managed_deployment: false,
                 whitelabeling: false,
@@ -311,6 +322,7 @@ impl BillingPlan {
                 audit_logs: false,
                 remove_created_with: true,
                 custom_sso: false,
+                api_access: true,
                 managed_deployment: false,
                 whitelabeling: false,
                 live_chat_support: false,
@@ -327,6 +339,7 @@ impl BillingPlan {
                 audit_logs: true,
                 remove_created_with: true,
                 custom_sso: false,
+                api_access: true,
                 managed_deployment: false,
                 whitelabeling: false,
                 live_chat_support: false,
@@ -343,6 +356,7 @@ impl BillingPlan {
                 audit_logs: true,
                 remove_created_with: true,
                 custom_sso: true,
+                api_access: true,
                 managed_deployment: true,
                 whitelabeling: true,
                 live_chat_support: true,
@@ -359,6 +373,7 @@ impl BillingPlan {
                 audit_logs: true,
                 remove_created_with: true,
                 custom_sso: true,
+                api_access: true,
                 managed_deployment: true,
                 whitelabeling: true,
                 live_chat_support: true,
@@ -374,6 +389,7 @@ impl BillingPlan {
                 webhooks: true,
                 audit_logs: true,
                 remove_created_with: true,
+                api_access: true,
                 custom_sso: true,
                 managed_deployment: false,
                 whitelabeling: false,
@@ -402,6 +418,7 @@ impl Into<Vec<Feature>> for BillingPlanFeatures {
             custom_sso,
             managed_deployment,
             whitelabeling,
+            api_access,
             live_chat_support,
             embeds,
             email_support,
@@ -414,6 +431,10 @@ impl Into<Vec<Feature>> for BillingPlanFeatures {
         }
 
         if custom_sso {
+            features.push(Feature::CustomSso)
+        }
+
+        if api_access {
             features.push(Feature::CustomSso)
         }
 
@@ -476,29 +497,29 @@ impl HasId for BillingPlan {
 }
 
 impl EntityMetadataProvider for BillingPlan {
-    fn icon(&self) -> &'static str {
+    fn icon(&self) -> Icon {
         match self {
-            BillingPlan::Community { .. } => "Heart",
-            BillingPlan::Starter { .. } => "ThumbsUp",
-            BillingPlan::Pro { .. } => "Zap",
-            BillingPlan::Team { .. } => "Users",
-            BillingPlan::Business { .. } => "Briefcase",
-            BillingPlan::Enterprise { .. } => "Building",
-            BillingPlan::Demo { .. } => "TestTube",
-            BillingPlan::CommercialSelfHosted { .. } => "ServerCog",
+            BillingPlan::Community { .. } => Icon::Heart,
+            BillingPlan::Starter { .. } => Icon::ThumbsUp,
+            BillingPlan::Pro { .. } => Icon::Zap,
+            BillingPlan::Team { .. } => Icon::Users,
+            BillingPlan::Business { .. } => Icon::Briefcase,
+            BillingPlan::Enterprise { .. } => Icon::Building,
+            BillingPlan::Demo { .. } => Icon::TestTube,
+            BillingPlan::CommercialSelfHosted { .. } => Icon::ServerCog,
         }
     }
 
-    fn color(&self) -> &'static str {
+    fn color(&self) -> Color {
         match self {
-            BillingPlan::Community { .. } => "pink",
-            BillingPlan::Starter { .. } => "blue",
-            BillingPlan::Pro { .. } => "yellow",
-            BillingPlan::Team { .. } => "orange",
-            BillingPlan::Business { .. } => "indigo",
-            BillingPlan::Enterprise { .. } => "teal",
-            BillingPlan::Demo { .. } => "purple",
-            BillingPlan::CommercialSelfHosted { .. } => "gray",
+            BillingPlan::Community { .. } => Color::Pink,
+            BillingPlan::Starter { .. } => Color::Blue,
+            BillingPlan::Pro { .. } => Color::Yellow,
+            BillingPlan::Team { .. } => Color::Orange,
+            BillingPlan::Business { .. } => Color::Indigo,
+            BillingPlan::Enterprise { .. } => Color::Teal,
+            BillingPlan::Demo { .. } => Color::Purple,
+            BillingPlan::CommercialSelfHosted { .. } => Color::Gray,
         }
     }
 }

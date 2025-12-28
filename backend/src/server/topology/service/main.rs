@@ -9,8 +9,11 @@ use uuid::Uuid;
 
 use crate::server::{
     auth::middleware::auth::AuthenticatedEntity,
+    bindings::{r#impl::base::Binding, service::BindingService},
     groups::{r#impl::base::Group, service::GroupService},
     hosts::{r#impl::base::Host, service::HostService},
+    interfaces::{r#impl::base::Interface, service::InterfaceService},
+    ports::{r#impl::base::Port, service::PortService},
     services::{r#impl::base::Service, service::ServiceService},
     shared::{
         events::{
@@ -42,9 +45,12 @@ use crate::server::{
 pub struct TopologyService {
     storage: Arc<GenericPostgresStorage<Topology>>,
     host_service: Arc<HostService>,
+    interface_service: Arc<InterfaceService>,
     subnet_service: Arc<SubnetService>,
     group_service: Arc<GroupService>,
     service_service: Arc<ServiceService>,
+    port_service: Arc<PortService>,
+    binding_service: Arc<BindingService>,
     event_bus: Arc<EventBus>,
     pub staleness_tx: broadcast::Sender<Topology>,
 }
@@ -80,7 +86,8 @@ impl CrudService<Topology> for TopologyService {
             entity
         };
 
-        let (hosts, subnets, groups) = self.get_entity_data(topology.base.network_id).await?;
+        let (hosts, interfaces, subnets, groups, ports, bindings) =
+            self.get_entity_data(topology.base.network_id).await?;
 
         let services = self
             .get_service_data(topology.base.network_id, &topology.base.options)
@@ -88,9 +95,12 @@ impl CrudService<Topology> for TopologyService {
 
         let params = BuildGraphParams {
             hosts: &hosts,
+            interfaces: &interfaces,
             services: &services,
             subnets: &subnets,
             groups: &groups,
+            ports: &ports,
+            bindings: &bindings,
             old_edges: &[],
             old_nodes: &[],
             options: &topology.base.options,
@@ -101,6 +111,7 @@ impl CrudService<Topology> for TopologyService {
         topology.base.edges = edges;
         topology.base.nodes = nodes;
         topology.base.hosts = hosts;
+        topology.base.interfaces = interfaces;
         topology.base.services = services;
         topology.base.subnets = subnets;
         topology.base.groups = groups;
@@ -131,29 +142,39 @@ impl CrudService<Topology> for TopologyService {
 pub struct BuildGraphParams<'a> {
     pub options: &'a TopologyOptions,
     pub hosts: &'a [Host],
+    pub interfaces: &'a [Interface],
     pub subnets: &'a [Subnet],
     pub services: &'a [Service],
     pub groups: &'a [Group],
+    pub ports: &'a [Port],
+    pub bindings: &'a [Binding],
     pub old_nodes: &'a [Node],
     pub old_edges: &'a [Edge],
 }
 
 impl TopologyService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         host_service: Arc<HostService>,
+        interface_service: Arc<InterfaceService>,
         subnet_service: Arc<SubnetService>,
         group_service: Arc<GroupService>,
         service_service: Arc<ServiceService>,
+        port_service: Arc<PortService>,
+        binding_service: Arc<BindingService>,
         storage: Arc<GenericPostgresStorage<Topology>>,
         event_bus: Arc<EventBus>,
     ) -> Self {
         let (staleness_tx, _) = broadcast::channel(100);
         Self {
             host_service,
+            interface_service,
             subnet_service,
             group_service,
             service_service,
             storage,
+            port_service,
+            binding_service,
             event_bus,
             staleness_tx,
         }
@@ -166,17 +187,35 @@ impl TopologyService {
     pub async fn get_entity_data(
         &self,
         network_id: Uuid,
-    ) -> Result<(Vec<Host>, Vec<Subnet>, Vec<Group>), Error> {
+    ) -> Result<
+        (
+            Vec<Host>,
+            Vec<Interface>,
+            Vec<Subnet>,
+            Vec<Group>,
+            Vec<Port>,
+            Vec<Binding>,
+        ),
+        Error,
+    > {
         let network_filter = EntityFilter::unfiltered().network_ids(&[network_id]);
         // Fetch all data
         let hosts = self
             .host_service
             .get_all(network_filter.clone().hidden_is(false))
             .await?;
+
+        let interfaces = self
+            .interface_service
+            .get_all(network_filter.clone())
+            .await?;
         let subnets = self.subnet_service.get_all(network_filter.clone()).await?;
         let groups = self.group_service.get_all(network_filter.clone()).await?;
 
-        Ok((hosts, subnets, groups))
+        let ports = self.port_service.get_all(network_filter.clone()).await?;
+        let bindings = self.binding_service.get_all(network_filter.clone()).await?;
+
+        Ok((hosts, interfaces, subnets, groups, ports, bindings))
     }
 
     pub async fn get_service_data(
@@ -204,16 +243,21 @@ impl TopologyService {
     pub fn build_graph(&self, params: BuildGraphParams) -> (Vec<Node>, Vec<Edge>) {
         let BuildGraphParams {
             hosts,
+            interfaces,
             subnets,
             services,
             groups,
+            ports,
+            bindings,
             old_edges,
             old_nodes,
             options,
         } = params;
 
         // Create context to avoid parameter passing
-        let ctx = TopologyContext::new(hosts, subnets, services, groups, options);
+        let ctx = TopologyContext::new(
+            hosts, interfaces, subnets, services, groups, ports, bindings, options,
+        );
 
         // Create all edges (needed for anchor analysis)
         let mut all_edges = Vec::new();

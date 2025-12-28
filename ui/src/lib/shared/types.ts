@@ -1,63 +1,52 @@
+import type { components } from '$lib/api/schema';
+import type { Color } from '$lib/shared/utils/styling';
+
+// Re-export generated types
+export type EntitySource = components['schemas']['EntitySource'];
+export type DiscoveryMetadata = components['schemas']['DiscoveryMetadata'];
+export type DiscoveryType = components['schemas']['DiscoveryType'];
+export type MatchDetails = components['schemas']['MatchDetails'];
+export type MatchConfidence = components['schemas']['MatchConfidence'];
+export type MatchReason = components['schemas']['MatchReason'];
+export type HostNamingFallback = components['schemas']['HostNamingFallback'];
+
+// Frontend-specific types
 export interface GetAllEntitiesRequest {
 	network_id: string;
 }
 
-export type EntitySource =
-	| { type: 'Manual' }
-	| { type: 'System' }
-	| { type: 'Unknown' }
-	| {
-			type: 'Discovery';
-			metadata: {
-				discovery_type: DiscoveryType;
-				daemon_id: string;
-			}[];
-	  }
-	| {
-			type: 'DiscoveryWithMatch';
-			metadata: {
-				discovery_type: DiscoveryType;
-				daemon_id: string;
-			}[];
-			details: MatchDetails;
-	  };
-
-export type MatchReason =
-	| { type: 'reason'; data: string }
-	| { type: 'container'; data: [string, MatchReason[]] };
-
-export interface MatchDetails {
-	reason: MatchReason;
-	confidence: 'NotApplicable' | 'Low' | 'Medium' | 'High' | 'Certain';
-}
-
-export function matchConfidenceColor(confidence: MatchDetails['confidence']): string {
-	const confidenceColor: Record<MatchDetails['confidence'], string> = {
-		NotApplicable: 'gray',
-		Low: 'red',
-		Medium: 'yellow',
-		High: 'green',
-		Certain: 'blue'
+export function matchConfidenceColor(confidence: MatchConfidence): Color {
+	const confidenceColor: Record<MatchConfidence, Color> = {
+		NotApplicable: 'Gray',
+		Low: 'Red',
+		Medium: 'Yellow',
+		High: 'Green',
+		Certain: 'Green'
 	};
 	return confidenceColor[confidence];
 }
 
-export function matchConfidenceLabel(details: MatchDetails): string {
-	const notApplicableReason =
-		details.reason.type == 'container' ? details.reason.data[0] : 'Unknown Reason';
-
-	const confidenceLabel: Record<MatchDetails['confidence'], string> = {
-		NotApplicable: `N/A (${notApplicableReason})`,
+export function matchConfidenceLabel(confidence: MatchConfidence): string {
+	const confidenceLabel: Record<MatchConfidence, string> = {
+		NotApplicable: 'Not Applicable',
 		Low: 'Low Confidence',
 		Medium: 'Medium Confidence',
 		High: 'High Confidence',
 		Certain: 'Certain'
 	};
-	return confidenceLabel[details.confidence];
+	return confidenceLabel[confidence];
 }
 
-export type DiscoveryType =
-	| { type: 'SelfReport' }
-	| { type: 'Network' }
-	| { type: 'Docker'; host_id: string }
-	| { type: 'Proxmox'; host_id: string };
+/** Get a display string for a MatchReason */
+export function matchReasonLabel(reason: MatchReason): string {
+	if (reason.type === 'reason') {
+		return reason.data;
+	} else {
+		// Container type: [name, children] - data is typed as unknown[] in schema
+		return reason.data[0] as string;
+	}
+}
+
+export function matchDetailsLabel(details: MatchDetails): string {
+	return `${matchConfidenceLabel(details.confidence)} - ${matchReasonLabel(details.reason)}`;
+}

@@ -1,45 +1,68 @@
 use crate::server::auth::middleware::auth::AuthenticatedEntity;
-use crate::server::auth::middleware::{
-    features::{BlockedInDemoMode, InviteUsersFeature, RequireFeature},
-    permissions::RequireMember,
+use crate::server::auth::middleware::features::{
+    BlockedInDemoMode, InviteUsersFeature, RequireFeature,
 };
+use crate::server::auth::middleware::permissions::RequireAdmin;
 use crate::server::config::AppState;
 use crate::server::invites::r#impl::base::Invite;
 use crate::server::organizations::r#impl::api::CreateInviteRequest;
 use crate::server::shared::services::traits::CrudService;
 use crate::server::shared::storage::filter::EntityFilter;
-use crate::server::shared::types::api::ApiError;
 use crate::server::shared::types::api::ApiResponse;
 use crate::server::shared::types::api::ApiResult;
+use crate::server::shared::types::api::{ApiError, ApiErrorResponse, EmptyApiResponse};
 use crate::server::users::r#impl::permissions::UserOrgPermissions;
 use anyhow::Error;
 use axum::Json;
-use axum::Router;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::response::Redirect;
-use axum::routing::{delete, get, post};
+use axum::routing::get;
 use std::sync::Arc;
 use tower_sessions::Session;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", post(create_invite))
-        .route("/", get(get_invites))
-        .route("/{id}", get(get_invite))
-        .route("/{id}/revoke", delete(revoke_invite))
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(get_invites, create_invite))
+        .routes(routes!(get_invite, revoke_invite))
+        // Accept invite link - redirect endpoint, not suitable for OpenAPI
         .route("/{id}/accept", get(accept_invite_link))
 }
 
-/// Create a new organization invite link
+/// Create invite
+#[utoipa::path(
+    post,
+    path = "",
+    tag = "invites",
+    request_body = CreateInviteRequest,
+    responses(
+        (status = 200, description = "Invite created", body = ApiResponse<Invite>),
+        (status = 403, description = "Cannot create invite with higher permissions", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 async fn create_invite(
     State(state): State<Arc<AppState>>,
-    RequireMember(user): RequireMember,
+    RequireAdmin(user): RequireAdmin,
     RequireFeature { plan, .. }: RequireFeature<InviteUsersFeature>,
     _demo_check: RequireFeature<BlockedInDemoMode>,
     Json(request): Json<CreateInviteRequest>,
 ) -> ApiResult<Json<ApiResponse<Invite>>> {
+    if request.permissions > user.permissions {
+        return Err(ApiError::forbidden(
+            "Cannot create invite with higher permissions than your own",
+        ));
+    }
+
+    for network_id in &request.network_ids {
+        if !user.network_ids.contains(network_id) {
+            return Err(ApiError::forbidden(
+                "Cannot grant access to networks you don't have access to",
+            ));
+        }
+    }
     // Seat limit check
     if let Some(max_seats) = plan.config().included_seats
         && plan.config().seat_cents.is_none()
@@ -70,12 +93,6 @@ async fn create_invite(
                 total_seats_used, max_seats
             )));
         }
-    }
-
-    if user.permissions < UserOrgPermissions::Admin {
-        return Err(ApiError::forbidden(
-            "Only admins and above can invite users to this organization",
-        ));
     }
 
     // Check if invited user already has an account
@@ -129,10 +146,21 @@ async fn create_invite(
     Ok(Json(ApiResponse::success(invite)))
 }
 
-/// Get information about an invite (for display purposes)
+/// Get an invite by ID
+#[utoipa::path(
+    get,
+    path = "/{id}",
+    tag = "invites",
+    params(("id" = Uuid, Path, description = "Invite ID")),
+    responses(
+        (status = 200, description = "Invite details", body = ApiResponse<Invite>),
+        (status = 400, description = "Invalid or expired invite", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 async fn get_invite(
     State(state): State<Arc<AppState>>,
-    RequireMember(_user): RequireMember,
+    RequireAdmin(_user): RequireAdmin,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ApiResponse<Invite>>> {
     let invite = state
@@ -145,10 +173,19 @@ async fn get_invite(
     Ok(Json(ApiResponse::success(invite)))
 }
 
-/// Get all invites for the user's organization
+/// List all invites
+#[utoipa::path(
+    get,
+    path = "",
+    tag = "invites",
+    responses(
+        (status = 200, description = "List of active invites", body = ApiResponse<Vec<Invite>>),
+    ),
+    security(("session" = []))
+)]
 async fn get_invites(
     State(state): State<Arc<AppState>>,
-    RequireMember(user): RequireMember,
+    RequireAdmin(user): RequireAdmin,
 ) -> ApiResult<Json<ApiResponse<Vec<Invite>>>> {
     // Show user invites that they created or created for users with permissions lower than them
     let invites = state
@@ -167,10 +204,22 @@ async fn get_invites(
     Ok(Json(ApiResponse::success(invites)))
 }
 
-/// Revoke an invite link
+/// Revoke an invite
+#[utoipa::path(
+    delete,
+    path = "/{id}/revoke",
+    tag = "invites",
+    params(("id" = Uuid, Path, description = "Invite ID")),
+    responses(
+        (status = 200, description = "Invite revoked", body = EmptyApiResponse),
+        (status = 400, description = "Invalid invite", body = ApiErrorResponse),
+        (status = 403, description = "Cannot revoke this invite", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 async fn revoke_invite(
     State(state): State<Arc<AppState>>,
-    RequireMember(user): RequireMember,
+    RequireAdmin(user): RequireAdmin,
     _demo_check: RequireFeature<BlockedInDemoMode>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ApiResponse<()>>> {

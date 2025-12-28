@@ -7,6 +7,9 @@ use openidconnect::{
     reqwest::Client as ReqwestClient,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use crate::server::config::DeploymentType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OidcPendingAuth {
@@ -19,6 +22,7 @@ pub struct OidcPendingAuth {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OidcRegisterParams<'a> {
     pub terms_accepted_at: Option<DateTime<Utc>>,
+    pub deployment_type: DeploymentType,
     pub billing_enabled: bool,
     pub provider_slug: &'a str,
     pub code: &'a str,
@@ -49,7 +53,7 @@ pub struct OidcProviderConfig {
     pub client_secret: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OidcProviderMetadata {
     pub name: String,
     pub slug: String,

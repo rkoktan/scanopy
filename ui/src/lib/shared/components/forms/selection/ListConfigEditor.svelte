@@ -43,14 +43,16 @@
 
 	function handleItemChange(updatedItem: TItem) {
 		if (selectedIndex >= 0 && selectedIndex < items.length) {
-			items[selectedIndex] = updatedItem;
-			items = items; // Trigger reactivity
-
+			// Don't mutate items directly - let the parent handle updates via callback
 			onChange(updatedItem, selectedIndex);
 		}
 	}
 
 	function handleMoveUp(fromIndex: number, toIndex: number) {
+		// Update items first via callback, then update selectedIndex
+		// This ensures selectedItem is computed with both changes applied
+		onReorder(fromIndex, toIndex);
+
 		// When an item moves up: fromIndex > toIndex
 		if (selectedIndex === fromIndex) {
 			// The selected item moved up
@@ -59,10 +61,13 @@
 			// Selected item got pushed down by the moving item
 			selectedIndex = selectedIndex + 1;
 		}
-		onReorder(fromIndex, toIndex);
 	}
 
 	function handleMoveDown(fromIndex: number, toIndex: number) {
+		// Update items first via callback, then update selectedIndex
+		// This ensures selectedItem is computed with both changes applied
+		onReorder(fromIndex, toIndex);
+
 		// When an item moves down: fromIndex < toIndex
 		if (selectedIndex === fromIndex) {
 			// The selected item moved down
@@ -71,7 +76,6 @@
 			// Selected item got pushed up by the moving item
 			selectedIndex = selectedIndex - 1;
 		}
-		onReorder(fromIndex, toIndex);
 	}
 </script>
 

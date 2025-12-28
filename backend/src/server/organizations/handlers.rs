@@ -10,29 +10,68 @@ use crate::server::shared::handlers::traits::{CrudHandlers, update_handler};
 use crate::server::shared::services::traits::CrudService;
 use crate::server::shared::storage::filter::EntityFilter;
 use crate::server::shared::storage::traits::StorableEntity;
-use crate::server::shared::types::api::ApiError;
 use crate::server::shared::types::api::ApiResponse;
 use crate::server::shared::types::api::ApiResult;
+use crate::server::shared::types::api::{ApiError, ApiErrorResponse, EmptyApiResponse};
 use crate::server::users::r#impl::base::{User, UserBase};
 use crate::server::users::r#impl::permissions::UserOrgPermissions;
 use anyhow::anyhow;
 use axum::Json;
-use axum::Router;
 use axum::extract::Path;
 use axum::extract::State;
-use axum::routing::{get, post, put};
 use email_address::EmailAddress;
 use std::sync::Arc;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/{id}", put(update_org_name))
-        .route("/", get(get_by_id_handler))
-        .route("/{id}/reset", post(reset))
-        .route("/{id}/populate-demo", post(populate_demo_data))
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(get_organization, update_org_name))
+        .routes(routes!(reset))
+        .routes(routes!(populate_demo_data))
 }
 
+/// Get the current user's organization
+#[utoipa::path(
+    get,
+    path = "",
+    tag = "organizations",
+    responses(
+        (status = 200, description = "Organization details", body = ApiResponse<Organization>),
+        (status = 404, description = "Organization not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+pub async fn get_organization(
+    State(state): State<Arc<AppState>>,
+    user: AuthenticatedUser,
+) -> ApiResult<Json<ApiResponse<Organization>>> {
+    let service = Organization::get_service(&state);
+    let entity = service
+        .get_by_id(&user.organization_id)
+        .await
+        .map_err(|e| ApiError::internal_error(&e.to_string()))?
+        .ok_or_else(|| {
+            ApiError::not_found(format!("Organization '{}' not found", user.organization_id))
+        })?;
+
+    Ok(Json(ApiResponse::success(entity)))
+}
+
+/// Update organization name
+#[utoipa::path(
+    put,
+    path = "/{id}",
+    tag = "organizations",
+    params(("id" = Uuid, Path, description = "Organization ID")),
+    request_body = String,
+    responses(
+        (status = 200, description = "Organization updated", body = ApiResponse<Organization>),
+        (status = 403, description = "Only owners can update organization", body = ApiErrorResponse),
+        (status = 404, description = "Organization not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn update_org_name(
     State(state): State<Arc<AppState>>,
     RequireOwner(user): RequireOwner,
@@ -58,23 +97,19 @@ pub async fn update_org_name(
     .await
 }
 
-pub async fn get_by_id_handler(
-    State(state): State<Arc<AppState>>,
-    user: AuthenticatedUser,
-) -> ApiResult<Json<ApiResponse<Organization>>> {
-    let service = Organization::get_service(&state);
-    let entity = service
-        .get_by_id(&user.organization_id)
-        .await
-        .map_err(|e| ApiError::internal_error(&e.to_string()))?
-        .ok_or_else(|| {
-            ApiError::not_found(format!("Organization '{}' not found", user.organization_id))
-        })?;
-
-    Ok(Json(ApiResponse::success(entity)))
-}
-
 /// Reset all organization data (delete all entities except organization and owner user)
+#[utoipa::path(
+    post,
+    path = "/{id}/reset",
+    tags = ["organizations", "internal"],
+    params(("id" = Uuid, Path, description = "Organization ID")),
+    responses(
+        (status = 200, description = "Organization reset", body = EmptyApiResponse),
+        (status = 403, description = "Cannot reset another organization", body = ApiErrorResponse),
+        (status = 404, description = "Organization not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn reset(
     State(state): State<Arc<AppState>>,
     RequireOwner(user): RequireOwner,
@@ -100,6 +135,18 @@ pub async fn reset(
 }
 
 /// Populate demo data (only available for demo organizations)
+#[utoipa::path(
+    post,
+    path = "/{id}/populate-demo",
+    tags = ["organizations", "internal"],
+    params(("id" = Uuid, Path, description = "Organization ID")),
+    responses(
+        (status = 200, description = "Demo data populated", body = EmptyApiResponse),
+        (status = 403, description = "Only available for demo organizations", body = ApiErrorResponse),
+        (status = 404, description = "Organization not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn populate_demo_data(
     State(state): State<Arc<AppState>>,
     RequireOwner(user): RequireOwner,
@@ -181,16 +228,18 @@ pub async fn populate_demo_data(
     // 4. Hosts with Services - collect created services for group generation
     let mut all_created_services: Vec<Service> = Vec::new();
     for host_with_services in demo_data.hosts_with_services {
-        let (_host, services) = state
+        let host_response = state
             .services
             .host_service
-            .create_host_with_services(
+            .discover_host(
                 host_with_services.host,
+                host_with_services.interfaces,
+                host_with_services.ports,
                 host_with_services.services,
                 auth.clone(),
             )
             .await?;
-        all_created_services.extend(services);
+        all_created_services.extend(host_response.services);
     }
 
     // 5. Daemons (depends on hosts, networks, subnets)

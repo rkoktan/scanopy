@@ -5,14 +5,14 @@
 	 * A pure presentation layer for displaying billing plans.
 	 * Uses CSS Grid for consistent sticky header/footer on both desktop and mobile.
 	 */
-	import { Check, X, ChevronDown } from 'lucide-svelte';
+	import { Check, X, ChevronDown, Loader2 } from 'lucide-svelte';
 	import Tag from '$lib/shared/components/data/Tag.svelte';
 	import ToggleGroup from './ToggleGroup.svelte';
 	import ScanProgressIndicator from '$lib/features/discovery/components/ScanProgressIndicator.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { BillingPlan } from './types';
 	import type { BillingPlanMetadata, FeatureMetadata } from '$lib/shared/stores/metadata';
-	import type { ColorStyle } from '$lib/shared/utils/styling';
+	import type { ColorStyle, Color } from '$lib/shared/utils/styling';
 	import type { IconComponent } from '$lib/shared/utils/types';
 
 	/**
@@ -62,6 +62,7 @@
 	}: Props = $props();
 
 	let collapsedCategories = $state<Record<string, boolean>>({});
+	let loadingPlanType = $state<string | null>(null);
 
 	type PlanFilter = 'all' | 'personal' | 'commercial';
 	let planFilter = $derived<PlanFilter>(initialPlanFilter);
@@ -265,16 +266,16 @@
 		return billingPlanHelpers.getMetadata(plan.type)?.custom_price !== null;
 	}
 
-	function getHostingColor(hosting: string): string {
+	function getHostingColor(hosting: string): Color {
 		switch (hosting) {
 			case 'Cloud':
-				return 'sky';
+				return 'Cyan';
 			case 'Managed':
-				return 'purple';
+				return 'Purple';
 			case 'Self-Hosted':
-				return 'green';
+				return 'Green';
 			default:
-				return 'gray';
+				return 'Gray';
 		}
 	}
 
@@ -288,6 +289,15 @@
 
 	function isEnterprise(plan: BillingPlan): boolean {
 		return plan.type === 'Enterprise';
+	}
+
+	async function handlePlanSelect(plan: BillingPlan) {
+		loadingPlanType = plan.type;
+		try {
+			await onPlanSelect(plan);
+		} finally {
+			loadingPlanType = null;
+		}
 	}
 </script>
 
@@ -335,7 +345,7 @@
 								>
 							</div>
 							{#if isRecommended}
-								<Tag label="Recommended" color="yellow" />
+								<Tag label="Recommended" color="Yellow" />
 							{/if}
 						</div>
 					</div>
@@ -478,7 +488,7 @@
 										{@const value = getFeatureValue(plan.type, featureKey)}
 										<div class="grid-cell plan-cell text-center">
 											{#if comingSoon && value}
-												<Tag label="Coming Soon" color="gray" />
+												<Tag label="Coming Soon" color="Gray" />
 											{:else if typeof value === 'boolean'}
 												{#if value}
 													<Check class="mx-auto h-5 w-5 text-success lg:h-8 lg:w-8" />
@@ -519,6 +529,7 @@
 								<button
 									type="button"
 									onclick={() => onPlanInquiry(plan)}
+									disabled={loadingPlanType !== null}
 									class="btn-primary w-full whitespace-nowrap px-2 text-xs lg:text-sm"
 								>
 									Request Information
@@ -526,15 +537,21 @@
 							{:else if hosting === 'Cloud'}
 								<button
 									type="button"
-									onclick={() => onPlanSelect(plan)}
+									onclick={() => handlePlanSelect(plan)}
+									disabled={loadingPlanType !== null}
 									class="btn-primary w-full whitespace-nowrap px-2 text-xs lg:text-sm"
 								>
-									{trial ? 'Start Free Trial' : 'Get Started'}
+									{#if loadingPlanType === plan.type}
+										<Loader2 class="mx-auto h-4 w-4 animate-spin" />
+									{:else}
+										{trial ? 'Start Free Trial' : 'Get Started'}
+									{/if}
 								</button>
 								{#if commercial && onPlanInquiry}
 									<button
 										type="button"
 										onclick={() => onPlanInquiry(plan)}
+										disabled={loadingPlanType !== null}
 										class="btn-secondary w-full whitespace-nowrap text-xs lg:text-sm"
 									>
 										Contact Us
@@ -545,6 +562,7 @@
 									<button
 										type="button"
 										onclick={() => onPlanInquiry(plan)}
+										disabled={loadingPlanType !== null}
 										class="btn-primary w-full whitespace-nowrap text-xs lg:text-sm"
 									>
 										Contact Us
@@ -562,6 +580,7 @@
 								<button
 									type="button"
 									onclick={() => onPlanInquiry(plan)}
+									disabled={loadingPlanType !== null}
 									class="btn-primary w-full whitespace-nowrap text-xs lg:text-sm"
 								>
 									Contact Us

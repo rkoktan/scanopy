@@ -3,12 +3,16 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Display;
 use strum::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::server::shared::entities::EntityDiscriminants;
 use crate::server::{
     daemons::r#impl::api::DiscoveryUpdatePayload,
-    shared::types::metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    shared::types::{
+        Color, Icon,
+        metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    },
 };
 
 #[derive(
@@ -22,21 +26,29 @@ use crate::server::{
     IntoStaticStr,
     EnumDiscriminants,
     EnumIter,
+    ToSchema,
 )]
 #[serde(tag = "type")]
 pub enum DiscoveryType {
+    #[schema(title = "SelfReport")]
     SelfReport {
+        // ID of the host that the daemon is running on
         host_id: Uuid,
     },
-    // None = all interfaced subnets
+    #[schema(title = "Network")]
     Network {
+        #[schema(required)]
         subnet_ids: Option<Vec<Uuid>>,
         #[serde(default)]
+        #[schema(required)]
         host_naming_fallback: HostNamingFallback,
     },
+    #[schema(title = "Docker")]
     Docker {
+        // ID of the host that the daemon is running on
         host_id: Uuid,
         #[serde(default)]
+        #[schema(required)]
         host_naming_fallback: HostNamingFallback,
     },
 }
@@ -59,25 +71,33 @@ impl Display for DiscoveryType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Copy, Deserialize, Eq, PartialEq, Hash, Display, Default)]
+#[derive(
+    Debug, Clone, Serialize, Copy, Deserialize, Eq, PartialEq, Hash, Display, Default, ToSchema,
+)]
 pub enum HostNamingFallback {
     Ip,
     #[default]
     BestService,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 #[serde(tag = "type")]
 pub enum RunType {
+    #[schema(title = "Scheduled")]
     Scheduled {
         cron_schedule: String,
+        #[serde(default)]
+        #[schema(read_only)]
         last_run: Option<DateTime<Utc>>,
         enabled: bool,
     },
-    Historical {
-        results: DiscoveryUpdatePayload,
-    },
+    #[schema(title = "Historical")]
+    /// Historical discovery runs are created by the server and cannot be submitted via API
+    Historical { results: DiscoveryUpdatePayload },
+    #[schema(title = "AdHoc")]
     AdHoc {
+        #[serde(default)]
+        #[schema(read_only)]
         last_run: Option<DateTime<Utc>>,
     },
 }
@@ -95,11 +115,11 @@ impl HasId for DiscoveryType {
 }
 
 impl EntityMetadataProvider for DiscoveryType {
-    fn color(&self) -> &'static str {
+    fn color(&self) -> Color {
         EntityDiscriminants::Discovery.color()
     }
 
-    fn icon(&self) -> &'static str {
+    fn icon(&self) -> Icon {
         EntityDiscriminants::Discovery.icon()
     }
 }

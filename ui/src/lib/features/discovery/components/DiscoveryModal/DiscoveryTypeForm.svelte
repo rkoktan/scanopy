@@ -1,28 +1,41 @@
 <script lang="ts">
-	import type { FormApi } from '$lib/shared/components/forms/types';
-	import SelectInput from '$lib/shared/components/forms/input/SelectInput.svelte';
-	import { field } from 'svelte-forms';
-	import { required } from 'svelte-forms/validators';
-	import { subnets } from '$lib/features/subnets/store';
+	import { useSubnetsQuery } from '$lib/features/subnets/queries';
 	import { SubnetDisplay } from '$lib/shared/components/forms/selection/display/SubnetDisplay.svelte';
 	import ListManager from '$lib/shared/components/forms/selection/ListManager.svelte';
-	import type { Docker, Network, SelfReport } from '../../types/api';
+	import type { DockerDiscovery, NetworkDiscovery, SelfReportDiscovery } from '../../types/api';
 	import type { Discovery } from '../../types/base';
 	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import { discoveryTypes, subnetTypes } from '$lib/shared/stores/metadata';
 	import type { Daemon } from '$lib/features/daemons/types/base';
-	import { generateCronSchedule, parseCronToHours } from '../../store';
+	import { generateCronSchedule, parseCronToHours } from '../../queries';
 
-	export let formApi: FormApi;
-	export let formData: Discovery;
-	export let readOnly: boolean = false;
-	export let daemonHostId: string | null;
-	export let daemon: Daemon;
+	// Props
+	interface Props {
+		formData: Discovery;
+		readOnly?: boolean;
+		daemonHostId: string | null;
+		daemon: Daemon;
+	}
+
+	let { formData = $bindable(), readOnly = false, daemonHostId, daemon }: Props = $props();
+
+	// Queries
+	const subnetsQuery = useSubnetsQuery();
+
+	// Derived data
+	let subnetsData = $derived(subnetsQuery.data ?? []);
+
+	// Local state for form fields
+	let runType = $state(formData.run_type.type);
+	let discoveryType = $state(formData.discovery_type.type);
+	let hostNameFallback = $state<'BestService' | 'Ip'>(
+		formData.discovery_type.type === 'Network' || formData.discovery_type.type === 'Docker'
+			? formData.discovery_type.host_naming_fallback
+			: 'BestService'
+	);
 
 	// Discovery type options
-	const discoveryTypeField = field('discovery_type', formData.discovery_type.type, [required()]);
-
-	$: discoveryTypeOptions = [
+	let discoveryTypeOptions = $derived([
 		{ value: 'Network', label: 'Network Scan', disabled: false },
 		{
 			value: 'Docker',
@@ -30,17 +43,12 @@
 			disabled: daemonHostId == null || !daemon.capabilities.has_docker_socket
 		},
 		{ value: 'SelfReport', label: 'Self Report', disabled: daemonHostId == null }
-	];
-
-	const hostNameFallbackField = field('host_name_fallback', 'BestService', [required()]);
+	]);
 
 	const hostNameFallbackOptions = [
 		{ value: 'Ip', label: 'IP Address' },
 		{ value: 'BestService', label: 'Best Service' }
 	];
-
-	// Run type toggle
-	const runTypeField = field('run_type', formData.run_type.type, [required()]);
 
 	const runTypeOptions = [
 		{ value: 'AdHoc', label: 'AdHoc (Run on Demand)' },
@@ -48,14 +56,13 @@
 	];
 
 	// Handle run type changes
-	$: {
-		const type = $runTypeField.value;
-		if (type === 'AdHoc' && formData.run_type.type !== 'AdHoc') {
+	$effect(() => {
+		if (runType === 'AdHoc' && formData.run_type.type !== 'AdHoc') {
 			formData.run_type = {
 				type: 'AdHoc',
 				last_run: null
 			};
-		} else if (type === 'Scheduled' && formData.run_type.type !== 'Scheduled') {
+		} else if (runType === 'Scheduled' && formData.run_type.type !== 'Scheduled') {
 			formData.run_type = {
 				type: 'Scheduled',
 				cron_schedule: '0 0 */1 * * *', // Default: every hour
@@ -63,70 +70,74 @@
 				enabled: true
 			};
 		}
-	}
+	});
 
 	// Handle discovery type changes
-	$: {
-		const type = $discoveryTypeField.value;
-		if (type === 'Network' && formData.discovery_type.type !== 'Network') {
+	$effect(() => {
+		if (discoveryType === 'Network' && formData.discovery_type.type !== 'Network') {
 			formData.discovery_type = {
 				type: 'Network',
 				subnet_ids: daemon.capabilities.interfaced_subnet_ids,
 				host_naming_fallback: 'BestService'
-			} as Network;
-			hostNameFallbackField.set('BestService');
-		} else if (type === 'Docker' && formData.discovery_type.type !== 'Docker') {
+			} as NetworkDiscovery;
+			hostNameFallback = 'BestService';
+		} else if (discoveryType === 'Docker' && formData.discovery_type.type !== 'Docker') {
 			formData.discovery_type = {
 				type: 'Docker',
 				host_id: daemonHostId,
 				host_naming_fallback: 'BestService'
-			} as Docker;
-			hostNameFallbackField.set('BestService');
-		} else if (type === 'SelfReport' && formData.discovery_type.type !== 'SelfReport') {
+			} as DockerDiscovery;
+			hostNameFallback = 'BestService';
+		} else if (discoveryType === 'SelfReport' && formData.discovery_type.type !== 'SelfReport') {
 			formData.discovery_type = {
 				type: 'SelfReport',
 				host_id: daemonHostId
-			} as SelfReport;
+			} as SelfReportDiscovery;
 		}
-	}
+	});
 
-	// Handle host naming fallback changes
-	$: {
-		const fallbackValue = $hostNameFallbackField.value;
+	// Handle host naming fallback changes - only update if value actually changed
+	function handleHostNameFallbackChange() {
 		if (formData.discovery_type.type == 'Docker' || formData.discovery_type.type == 'Network') {
-			formData.discovery_type = {
-				...formData.discovery_type,
-				host_naming_fallback: fallbackValue as 'BestService' | 'Ip'
-			};
+			if (formData.discovery_type.host_naming_fallback !== hostNameFallback) {
+				formData.discovery_type = {
+					...formData.discovery_type,
+					host_naming_fallback: hostNameFallback
+				};
+			}
 		}
 	}
 
 	// Subnet management for Network
-	$: availableSubnets = $subnets.filter(
-		(s) =>
-			formData.discovery_type.type === 'Network' &&
-			s.network_id == formData.network_id &&
-			!formData.discovery_type.subnet_ids?.includes(s.id) &&
-			subnetTypes.getMetadata(s.subnet_type).network_scan_discovery_eligible
+	let availableSubnets = $derived(
+		subnetsData.filter(
+			(s) =>
+				formData.discovery_type.type === 'Network' &&
+				s.network_id == formData.network_id &&
+				!formData.discovery_type.subnet_ids?.includes(s.id) &&
+				subnetTypes.getMetadata(s.subnet_type).network_scan_discovery_eligible
+		)
 	);
 
-	$: selectedSubnets =
+	let selectedSubnets = $derived(
 		formData.discovery_type.type === 'Network' && formData.discovery_type.subnet_ids
 			? formData.discovery_type.subnet_ids
-					.map((id) => $subnets.find((s) => s.id === id))
+					.map((id) => subnetsData.find((s) => s.id === id))
 					.filter(Boolean)
-			: [];
+			: []
+	);
 
-	$: nonInterfacedSubnets =
+	let nonInterfacedSubnets = $derived(
 		formData.discovery_type.type == 'Network' &&
-		formData.discovery_type.subnet_ids &&
-		formData.discovery_type.subnet_ids.length > 0
+			formData.discovery_type.subnet_ids &&
+			formData.discovery_type.subnet_ids.length > 0
 			? formData.discovery_type.subnet_ids
 					.filter((s) => !daemon.capabilities.interfaced_subnet_ids.includes(s))
-					.map((s) => $subnets.find((subnet) => subnet.id == s))
+					.map((s) => subnetsData.find((subnet) => subnet.id == s))
 					.filter((s) => s != undefined)
 					.map((s) => s.name + ` (${s.cidr})`)
-			: [];
+			: []
+	);
 
 	function handleAddSubnet(subnetId: string) {
 		if (formData.discovery_type.type === 'Network') {
@@ -148,25 +159,33 @@
 	}
 
 	// Frequency configuration - convert between hours and cron
-	let selectedDays = 1;
-	let selectedHours = 0;
-
-	// Parse existing cron schedule on mount/update
-	$: if (formData.run_type.type === 'Scheduled' && formData.run_type.cron_schedule) {
-		const totalHours = parseCronToHours(formData.run_type.cron_schedule);
-		if (totalHours !== null) {
-			selectedDays = Math.floor(totalHours / 24);
-			selectedHours = totalHours % 24;
+	// Initialize from formData's cron schedule (parse once on init)
+	function getInitialDaysHours(): { days: number; hours: number } {
+		if (formData.run_type.type === 'Scheduled' && formData.run_type.cron_schedule) {
+			const totalHours = parseCronToHours(formData.run_type.cron_schedule);
+			if (totalHours !== null) {
+				return {
+					days: Math.floor(totalHours / 24),
+					hours: totalHours % 24
+				};
+			}
 		}
+		return { days: 1, hours: 0 };
 	}
 
-	// Generate cron schedule from selected hours
-	$: if (formData.run_type.type === 'Scheduled') {
-		const totalHours = selectedDays * 24 + selectedHours;
-		formData.run_type = {
-			...formData.run_type,
-			cron_schedule: generateCronSchedule(totalHours)
-		};
+	const initial = getInitialDaysHours();
+	let selectedDays = $state(initial.days);
+	let selectedHours = $state(initial.hours);
+
+	// Generate cron schedule from selected hours - only when user changes the values
+	function handleFrequencyChange() {
+		if (formData.run_type.type === 'Scheduled') {
+			const totalHours = selectedDays * 24 + selectedHours;
+			formData.run_type = {
+				...formData.run_type,
+				cron_schedule: generateCronSchedule(totalHours)
+			};
+		}
 	}
 
 	// Day and hour options
@@ -179,12 +198,6 @@
 		value: String(i),
 		label: i === 0 ? 'No hours' : i === 1 ? '1 hour' : `${i} hours`
 	}));
-
-	const daysField = field('frequency_days', String(selectedDays), []);
-	const hoursField = field('frequency_hours', String(selectedHours), []);
-
-	$: selectedDays = parseInt($daysField.value) || 0;
-	$: selectedHours = parseInt($hoursField.value) || 0;
 </script>
 
 <div class="space-y-6">
@@ -193,28 +206,41 @@
 
 		<div class="space-y-4">
 			<!-- Run Type Selection -->
-			<SelectInput
-				label="Run Type"
-				id="run_type"
-				{formApi}
-				field={runTypeField}
-				options={runTypeOptions}
-				disabled={readOnly}
-				helpText={$runTypeField.value === 'AdHoc'
-					? 'This discovery will only run when manually triggered'
-					: 'This discovery will run automatically on a schedule'}
-			/>
+			<div>
+				<label for="run_type" class="text-secondary mb-1 block text-sm font-medium">
+					Run Type <span class="text-red-400">*</span>
+				</label>
+				<select id="run_type" class="input-field w-full" bind:value={runType} disabled={readOnly}>
+					{#each runTypeOptions as option (option.value)}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+				<p class="text-tertiary mt-1 text-xs">
+					{runType === 'AdHoc'
+						? 'This discovery will only run when manually triggered'
+						: 'This discovery will run automatically on a schedule'}
+				</p>
+			</div>
 
 			<!-- Discovery Type Selection -->
-			<SelectInput
-				label="Discovery Type"
-				id="discovery_type"
-				{formApi}
-				helpText={discoveryTypes.getDescription($discoveryTypeField.value)}
-				field={discoveryTypeField}
-				options={discoveryTypeOptions}
-				disabled={readOnly}
-			/>
+			<div>
+				<label for="discovery_type" class="text-secondary mb-1 block text-sm font-medium">
+					Discovery Type <span class="text-red-400">*</span>
+				</label>
+				<select
+					id="discovery_type"
+					class="input-field w-full"
+					bind:value={discoveryType}
+					disabled={readOnly}
+				>
+					{#each discoveryTypeOptions as option (option.value)}
+						<option value={option.value} disabled={option.disabled}>{option.label}</option>
+					{/each}
+				</select>
+				<p class="text-tertiary mt-1 text-xs">
+					{discoveryTypes.getDescription(discoveryType)}
+				</p>
+			</div>
 
 			{#if daemonHostId == null}
 				<InlineWarning
@@ -224,16 +250,27 @@
 			{/if}
 
 			<!-- Type-specific configuration -->
-
 			{#if formData.discovery_type.type == 'Docker' || formData.discovery_type.type == 'Network'}
-				<SelectInput
-					label="Host Name Fallback"
-					id="host_name_fallback"
-					{formApi}
-					helpText="In the event that hostname can't be resolved, what name should be set for discovered hosts? IP Address, or best service (the highest confidence service match)?"
-					field={hostNameFallbackField}
-					options={hostNameFallbackOptions}
-				/>
+				<div>
+					<label for="host_name_fallback" class="text-secondary mb-1 block text-sm font-medium">
+						Host Name Fallback
+					</label>
+					<select
+						id="host_name_fallback"
+						class="input-field w-full"
+						bind:value={hostNameFallback}
+						disabled={readOnly}
+						onchange={handleHostNameFallbackChange}
+					>
+						{#each hostNameFallbackOptions as option (option.value)}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+					<p class="text-tertiary mt-1 text-xs">
+						In the event that hostname can't be resolved, what name should be set for discovered
+						hosts? IP Address, or best service (the highest confidence service match)?
+					</p>
+				</div>
 			{/if}
 
 			{#if formData.discovery_type.type === 'Network'}
@@ -245,7 +282,6 @@
 						emptyMessage="All subnets in network will be scanned"
 						allowReorder={false}
 						allowItemEdit={() => false}
-						{formApi}
 						showSearch={true}
 						options={availableSubnets}
 						items={selectedSubnets}
@@ -276,21 +312,39 @@
 				</p>
 
 				<div class="grid grid-cols-2 gap-4">
-					<SelectInput
-						label="Days"
-						id="frequency_days"
-						{formApi}
-						field={daysField}
-						options={dayOptions}
-					/>
+					<div>
+						<label for="frequency_days" class="text-secondary mb-1 block text-sm font-medium">
+							Days
+						</label>
+						<select
+							id="frequency_days"
+							class="input-field w-full"
+							bind:value={selectedDays}
+							disabled={readOnly}
+							onchange={handleFrequencyChange}
+						>
+							{#each dayOptions as option (option.value)}
+								<option value={parseInt(option.value)}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
 
-					<SelectInput
-						label="Hours"
-						id="frequency_hours"
-						{formApi}
-						field={hoursField}
-						options={hourOptions}
-					/>
+					<div>
+						<label for="frequency_hours" class="text-secondary mb-1 block text-sm font-medium">
+							Hours
+						</label>
+						<select
+							id="frequency_hours"
+							class="input-field w-full"
+							bind:value={selectedHours}
+							disabled={readOnly}
+							onchange={handleFrequencyChange}
+						>
+							{#each hourOptions as option (option.value)}
+								<option value={parseInt(option.value)}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
 				</div>
 			</div>
 		</div>

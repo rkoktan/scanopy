@@ -10,32 +10,58 @@ use crate::server::subnets::r#impl::types::SubnetType;
 use chrono::{DateTime, Utc};
 use cidr::{IpCidr, Ipv4Cidr};
 use pnet::ipnetwork::IpNetwork;
+use serde::de::Error as DeError;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::server::{hosts::r#impl::base::Host, services::r#impl::base::Service};
+use crate::server::{interfaces::r#impl::base::Interface, services::r#impl::base::Service};
 
-#[derive(Debug, Clone, Validate, Serialize, Deserialize, Eq, PartialEq, Hash)]
+fn deserialize_cidr<'de, D>(deserializer: D) -> Result<IpCidr, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    s.parse::<IpCidr>().map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("host part of address was not zero") {
+            DeError::custom(format!(
+                "Invalid CIDR '{}': address doesn't align with the subnet mask. Use a network address (e.g., for /24, the last octet should be 0).",
+                s
+            ))
+        } else {
+            DeError::custom(format!("Invalid CIDR '{}': {}", s, msg))
+        }
+    })
+}
+
+#[derive(Debug, Clone, Validate, Serialize, Deserialize, Eq, PartialEq, Hash, ToSchema)]
 pub struct SubnetBase {
+    #[schema(value_type = String)]
+    #[serde(deserialize_with = "deserialize_cidr")]
     pub cidr: IpCidr,
     pub network_id: Uuid,
     #[validate(length(min = 0, max = 100))]
-    pub name: String, // "Home LAN", "VPN Network", etc.
+    pub name: String,
     #[serde(deserialize_with = "deserialize_empty_string_as_none")]
     #[validate(length(min = 0, max = 500))]
     pub description: Option<String>,
     pub subnet_type: SubnetType,
+    #[serde(default)]
+    #[schema(required)]
+    /// Will be automatically set to Manual for creation through API
     pub source: EntitySource,
     #[serde(default)]
+    #[schema(required)]
     pub tags: Vec<Uuid>,
 }
 
 impl Default for SubnetBase {
     fn default() -> Self {
         Self {
-            cidr: IpCidr::V4(Ipv4Cidr::new(Ipv4Addr::new(127, 0, 0, 1), 24).unwrap()),
+            cidr: IpCidr::V4(Ipv4Cidr::new(Ipv4Addr::new(192, 168, 4, 0), 24).unwrap()),
             name: "New Subnet".to_string(),
             network_id: Uuid::new_v4(),
             description: None,
@@ -46,12 +72,20 @@ impl Default for SubnetBase {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, Default, ToSchema, Validate)]
+#[schema(example = crate::server::shared::types::examples::subnet)]
 pub struct Subnet {
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub id: Uuid,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub updated_at: DateTime<Utc>,
     #[serde(flatten)]
+    #[validate(nested)]
     pub base: SubnetBase,
 }
 
@@ -107,9 +141,13 @@ impl Subnet {
         }
     }
 
-    pub fn has_interface_with_service(&self, host: &Host, service: &Service) -> bool {
+    pub fn has_interface_with_service(
+        &self,
+        host_interfaces: &[&Interface],
+        service: &Service,
+    ) -> bool {
         service.base.bindings.iter().any(|binding| {
-            host.base.interfaces.iter().any(|interface| {
+            host_interfaces.iter().any(|interface| {
                 let interface_match = match binding.interface_id() {
                     Some(id) => interface.id == id,
                     None => true, // Listens on all interfaces

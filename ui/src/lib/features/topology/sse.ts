@@ -38,6 +38,9 @@ class TopologySSEManager extends BaseSSEManager<Topology> {
 						removed_hosts: update.removed_hosts,
 						removed_services: update.removed_services,
 						removed_subnets: update.removed_subnets,
+						removed_bindings: update.removed_bindings,
+						removed_interfaces: update.removed_interfaces,
+						removed_ports: update.removed_ports,
 						is_stale: update.is_stale,
 						options: update.options
 					});
@@ -49,9 +52,7 @@ class TopologySSEManager extends BaseSSEManager<Topology> {
 			onError: (error) => {
 				console.error('Topology SSE error:', error);
 			},
-			onOpen: () => {
-				console.log('Topology SSE connected');
-			}
+			onOpen: () => {}
 		};
 	}
 

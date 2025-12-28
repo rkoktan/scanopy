@@ -1,10 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, str::FromStr};
 use strum::{Display, EnumIter, IntoEnumIterator, IntoStaticStr};
+use utoipa::ToSchema;
 
 use crate::server::shared::{
     entities::EntityDiscriminants,
-    types::metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    types::{
+        Color, Icon,
+        metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+    },
 };
 
 #[derive(
@@ -20,6 +24,7 @@ use crate::server::shared::{
     IntoStaticStr,
     Hash,
     Default,
+    ToSchema,
 )]
 pub enum UserOrgPermissions {
     Owner,
@@ -83,11 +88,11 @@ impl HasId for UserOrgPermissions {
 }
 
 impl EntityMetadataProvider for UserOrgPermissions {
-    fn color(&self) -> &'static str {
+    fn color(&self) -> Color {
         EntityDiscriminants::User.color()
     }
 
-    fn icon(&self) -> &'static str {
+    fn icon(&self) -> Icon {
         EntityDiscriminants::User.icon()
     }
 }

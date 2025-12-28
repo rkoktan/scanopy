@@ -1,153 +1,218 @@
 <script lang="ts">
-	import { field } from 'svelte-forms';
 	import type { InterfaceBinding, PortBinding, Service } from '$lib/features/services/types/base';
 	import { serviceDefinitions } from '$lib/shared/stores/metadata';
 	import ListManager from '$lib/shared/components/forms/selection/ListManager.svelte';
-	import type { FormApi } from '$lib/shared/components/forms/types';
-	import { required } from 'svelte-forms/validators';
 	import { pushWarning } from '$lib/shared/stores/feedback';
-	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
-	import { maxLength } from '$lib/shared/components/forms/validators';
+	import { required, max } from '$lib/shared/components/forms/validators';
 	import ConfigHeader from '$lib/shared/components/forms/config/ConfigHeader.svelte';
 	import { v4 as uuidv4 } from 'uuid';
-	import { getServicesForPort } from '$lib/features/services/store';
+	import { useServicesQuery } from '$lib/features/services/queries';
 	import { PortBindingDisplay } from '$lib/shared/components/forms/selection/display/PortBindingDisplay.svelte';
 	import { InterfaceBindingDisplay } from '$lib/shared/components/forms/selection/display/InterfaceBindingDisplay.svelte';
 	import MatchDetails from './MatchDetails.svelte';
-	import type { Host } from '$lib/features/hosts/types/base';
-	import { get, readable, type Readable } from 'svelte/store';
+	import type { HostFormData } from '$lib/features/hosts/types/base';
 	import TagPicker from '$lib/features/tags/components/TagPicker.svelte';
+	import { useInterfacesQuery } from '$lib/features/interfaces/queries';
+	import { usePortsQuery } from '$lib/features/ports/queries';
+	import { useSubnetsQuery, isContainerSubnet } from '$lib/features/subnets/queries';
+	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 
-	export let formApi: FormApi;
-	export let host: Host;
-	export let service: Service;
-	export let onChange: (updatedService: Service) => void = () => {};
-	export let selectedPortBindings: PortBinding[] = [];
-	export let index: number = -1;
+	// TanStack Query hooks
+	const servicesQuery = useServicesQuery();
+	const interfacesQuery = useInterfacesQuery();
+	const portsQuery = usePortsQuery();
+	const subnetsQuery = useSubnetsQuery();
 
-	let currentServiceId: string = service.id;
-	let currentServiceIndex: number = index;
+	let servicesData = $derived(servicesQuery.data ?? []);
+	let interfacesData = $derived(interfacesQuery.data ?? []);
+	let portsData = $derived(portsQuery.data ?? []);
+	let subnetsData = $derived(subnetsQuery.data ?? []);
 
-	const getNameField = () => {
-		return field(`service_name_${currentServiceId}_${index}`, service.name, [
-			required(),
-			maxLength(100)
-		]);
-	};
+	// Helper to check if subnet is a container subnet
+	let isContainerSubnetFn = $derived((subnetId: string) => {
+		const subnet = subnetsData.find((s) => s.id === subnetId);
+		return subnet ? isContainerSubnet(subnet) : false;
+	});
 
-	let nameField = getNameField();
+	// Check if an interface is unsaved (not yet in the global cache)
+	function isInterfaceUnsaved(id: string): boolean {
+		return !interfacesData.some((i) => i.id === id);
+	}
 
-	$: serviceMetadata = service ? serviceDefinitions.getItem(service.service_definition) : null;
+	// Check if a port is unsaved (not yet in the global cache)
+	function isPortUnsaved(id: string): boolean {
+		return !portsData.some((p) => p.id === id);
+	}
 
-	$: if (currentServiceIndex !== index) {
-		currentServiceIndex = index;
-		nameField = getNameField();
+	// Get services for a specific port
+	function getServicesForPort(portId: string): Service[] {
+		const port = portsData.find((p) => p.id === portId);
+		if (!port) return [];
+
+		return servicesData.filter(
+			(s) =>
+				s.host_id === port.host_id &&
+				s.bindings.some((b) => b.type === 'Port' && (b as PortBinding).port_id === portId)
+		);
+	}
+
+	interface Props {
+		host: HostFormData;
+		service: Service;
+		onChange?: (updatedService: Service) => void;
+		selectedPortBindings?: PortBinding[];
+		index?: number;
+	}
+
+	let {
+		host,
+		service,
+		onChange = () => {},
+		selectedPortBindings = $bindable([]),
+		index = -1
+	}: Props = $props();
+
+	// Local state for form fields
+	let name = $state(service.name);
+	let nameError = $state<string | undefined>(undefined);
+
+	let currentServiceId = $state(service.id);
+	let currentServiceIndex = $state(index);
+
+	let serviceMetadata = $derived(
+		service ? serviceDefinitions.getItem(service.service_definition) : null
+	);
+
+	// Reset fields when service changes
+	$effect(() => {
+		if (currentServiceIndex !== index || currentServiceId !== service.id) {
+			currentServiceIndex = index;
+			currentServiceId = service.id;
+			name = service.name;
+			nameError = undefined;
+		}
+	});
+
+	// Handle name change with validation
+	function handleNameChange(e: Event) {
+		const value = (e.target as HTMLInputElement).value;
+		name = value;
+		nameError = required(value) || max(100)(value);
+		triggerNameChange();
+	}
+
+	function triggerNameChange() {
+		if (name !== service.name) {
+			onChange({
+				...service,
+				name: name
+			});
+		}
 	}
 
 	// Port Bindings Logic
-	$: portBindings = service.bindings.filter((b) => b.type === 'Port') as PortBinding[];
+	let portBindings = $derived(service.bindings.filter((b) => b.type === 'Port') as PortBinding[]);
 
 	// Interface Bindings Logic
-	$: interfaceBindings = service.bindings.filter(
-		(b) => b.type === 'Interface'
-	) as InterfaceBinding[];
+	let interfaceBindings = $derived(
+		service.bindings.filter((b) => b.type === 'Interface') as InterfaceBinding[]
+	);
 
 	// Get interfaces that this service has Port bindings on
-	$: interfacesWithPortBindingsThisService = new Set(
-		portBindings.map((b) => b.interface_id).filter((id): id is string => id !== null)
+	let interfacesWithPortBindingsThisService = $derived(
+		new Set(portBindings.map((b) => b.interface_id).filter((id): id is string => id !== null))
 	);
+
+	// Check if this service has a Port binding on "All Interfaces"
+	let hasPortBindingOnAllInterfaces = $derived(portBindings.some((b) => b.interface_id === null));
 
 	// Get interfaces that this service has Interface bindings on
-	$: interfacesWithInterfaceBindingsThisService = new Set(
-		interfaceBindings.map((b) => b.interface_id)
+	let interfacesWithInterfaceBindingsThisService = $derived(
+		new Set(interfaceBindings.map((b) => b.interface_id))
 	);
 
 	// Available port+interface combinations for new Port bindings
+	// Only includes saved interfaces and ports (those not yet in global stores)
+	let availablePortCombinations = $derived(
+		host.interfaces
+			.filter((iface) => !isInterfaceUnsaved(iface.id)) // Skip unsaved interfaces
+			.flatMap((iface) => {
+				// Can't add Port binding if THIS service has an Interface binding on this interface
+				if (interfacesWithInterfaceBindingsThisService.has(iface.id)) {
+					return [];
+				}
 
-	// First, get all services for all ports reactively
-	$: allPortServicesStores = host.ports.map((port) => ({
-		portId: port.id,
-		store: getServicesForPort(port.id)
-	}));
+				return host.ports
+					.filter((port) => {
+						// Skip unsaved ports
+						if (isPortUnsaved(port.id)) return false;
 
-	// Subscribe to all of them
-	$: allPortServices = allPortServicesStores.map(({ portId, store }) => ({
-		portId,
-		services: store
-	}));
+						// Check if this specific port+interface combo is already bound by this service
+						const alreadyBoundByThisService = portBindings.some(
+							(b) => b.port_id === port.id && b.interface_id === iface.id
+						);
+						if (alreadyBoundByThisService) return false;
 
-	// Available port+interface combinations for new Port bindings
-	$: availablePortCombinations = host.interfaces.flatMap((iface) => {
-		// Can't add Port binding if THIS service has an Interface binding on this interface
-		if (interfacesWithInterfaceBindingsThisService.has(iface.id)) {
-			return [];
-		}
+						// Get services for this port
+						const servicesForPort = getServicesForPort(port.id);
+						const otherServices = servicesForPort.filter((s) => s.id !== service.id);
 
-		return host.ports
-			.filter((port) => {
-				// Check if this specific port+interface combo is already bound by this service
-				const alreadyBoundByThisService = portBindings.some(
-					(b) => b.port_id === port.id && b.interface_id === iface.id
-				);
-				if (alreadyBoundByThisService) return false;
+						const boundByOtherService = otherServices.some((s) =>
+							s.bindings.some(
+								(b) =>
+									b.type === 'Port' &&
+									(b as PortBinding).port_id === port.id &&
+									(b.interface_id === iface.id || b.interface_id === null)
+							)
+						);
+						if (boundByOtherService) return false;
 
-				// Get services for this port from our reactive map
-				const servicesForPort =
-					allPortServices.find((p) => p.portId === port.id)?.services ||
-					(readable([]) as Readable<Service[]>);
-				const otherServices = get(servicesForPort).filter((s) => s.id !== service.id);
+						// Check if this service has bound this port to ALL interfaces (null)
+						const boundToAllInterfaces = portBindings.some(
+							(b) => b.port_id === port.id && b.interface_id === null
+						);
+						if (boundToAllInterfaces) return false;
 
-				const boundByOtherService = otherServices.some((s) =>
-					s.bindings.some(
-						(b) =>
-							b.type === 'Port' &&
-							b.port_id === port.id &&
-							(b.interface_id === iface.id || b.interface_id === null)
-					)
-				);
-				if (boundByOtherService) return false;
-
-				// Check if this service has bound this port to ALL interfaces (null)
-				const boundToAllInterfaces = portBindings.some(
-					(b) => b.port_id === port.id && b.interface_id === null
-				);
-				if (boundToAllInterfaces) return false;
-
-				return true;
+						return true;
+					})
+					.map((port) => ({ port, iface }));
 			})
-			.map((port) => ({ port, iface }));
-	});
+	);
 
-	$: canCreatePortBinding = availablePortCombinations.length > 0;
+	// Count of unsaved items for messaging
+	let unsavedInterfaceCount = $derived(
+		host.interfaces.filter((i) => isInterfaceUnsaved(i.id)).length
+	);
+	let unsavedPortCount = $derived(host.ports.filter((p) => isPortUnsaved(p.id)).length);
+	let hasUnsavedItems = $derived(unsavedInterfaceCount > 0 || unsavedPortCount > 0);
+
+	let canCreatePortBinding = $derived(availablePortCombinations.length > 0);
 
 	// Available interfaces for new Interface bindings
-	$: availableInterfacesForInterfaceBinding = host.interfaces.filter((iface) => {
-		// Can't add Interface binding if this service already has one on this interface
-		if (interfaceBindings.some((b) => b.interface_id === iface.id)) {
-			return false;
-		}
+	// Only includes saved interfaces (those already in global store)
+	let availableInterfacesForInterfaceBinding = $derived(
+		host.interfaces.filter((iface) => {
+			// Skip unsaved interfaces
+			if (isInterfaceUnsaved(iface.id)) return false;
 
-		// Can't add Interface binding if THIS service has Port bindings on this interface
-		if (interfacesWithPortBindingsThisService.has(iface.id)) {
-			return false;
-		}
+			// Can't add Interface binding if service has Port binding on "All Interfaces"
+			if (hasPortBindingOnAllInterfaces) return false;
 
-		return true;
-	});
+			// Can't add Interface binding if this service already has one on this interface
+			if (interfaceBindings.some((b) => b.interface_id === iface.id)) {
+				return false;
+			}
 
-	$: canCreateInterfaceBinding = availableInterfacesForInterfaceBinding.length > 0;
+			// Can't add Interface binding if THIS service has Port bindings on this interface
+			if (interfacesWithPortBindingsThisService.has(iface.id)) {
+				return false;
+			}
 
-	// Update service when field values change
-	$: if ($nameField) {
-		const updatedService: Service = {
-			...service,
-			name: $nameField.value
-		};
+			return true;
+		})
+	);
 
-		if (updatedService.name !== service.name) {
-			onChange(updatedService);
-		}
-	}
+	let canCreateInterfaceBinding = $derived(availableInterfacesForInterfaceBinding.length > 0);
 
 	// Port Binding Handlers
 	function handleCreatePortBinding() {
@@ -176,8 +241,12 @@
 		const binding: PortBinding = {
 			type: 'Port',
 			id: uuidv4(),
+			service_id: service.id,
+			network_id: service.network_id,
 			port_id: firstAvailable.port.id,
-			interface_id: firstAvailable.iface.id
+			interface_id: firstAvailable.iface.id,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString()
 		};
 
 		onChange({
@@ -241,7 +310,11 @@
 		const binding: InterfaceBinding = {
 			type: 'Interface',
 			id: uuidv4(),
-			interface_id: firstAvailable.id
+			service_id: service.id,
+			network_id: service.network_id,
+			interface_id: firstAvailable.id,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString()
 		};
 
 		onChange({
@@ -286,24 +359,37 @@
 
 {#if service && serviceMetadata}
 	<div class="space-y-6">
-		<ConfigHeader title={serviceMetadata.name} subtitle={serviceMetadata.description} />
+		<ConfigHeader title={serviceMetadata.name ?? ''} subtitle={serviceMetadata.description} />
 
 		<!-- Basic Configuration -->
 		<div class="space-y-4">
 			<div class="text-primary font-medium">Details</div>
 			<!-- Service Name Field -->
-			{#if $nameField}
-				<TextInput
-					label="Name"
+			<div>
+				<label
+					for="service_name_{service.id}"
+					class="text-secondary mb-1 block text-sm font-medium"
+				>
+					Name <span class="text-red-400">*</span>
+				</label>
+				<input
+					type="text"
 					id="service_name_{service.id}"
-					{formApi}
-					required={true}
+					class="input-field w-full"
 					placeholder="Enter a descriptive name..."
-					field={nameField}
+					value={name}
+					oninput={handleNameChange}
 				/>
-			{/if}
+				{#if nameError}
+					<p class="mt-1 text-xs text-red-400">{nameError}</p>
+				{/if}
+			</div>
 
-			<TagPicker bind:selectedTagIds={service.tags} />
+			<!-- service prop comes via slot, so use callback pattern instead of bind: -->
+			<TagPicker
+				selectedTagIds={service.tags}
+				onChange={(tags) => onChange({ ...service, tags })}
+			/>
 		</div>
 
 		<div>
@@ -312,6 +398,22 @@
 				For a given interface, a service can have either port bindings OR an interface binding, not
 				both.
 			</span>
+			{#if hasUnsavedItems}
+				<InlineWarning
+					title={(() => {
+						if (unsavedInterfaceCount > 0 && unsavedPortCount > 0) {
+							return `${unsavedInterfaceCount} unsaved interface${unsavedInterfaceCount > 1 ? 's' : ''} and ${unsavedPortCount}
+							unsaved port${unsavedPortCount > 1 ? 's' : ''} — save host to bind to them.`;
+						} else if (unsavedInterfaceCount > 0) {
+							return `${unsavedInterfaceCount} unsaved interface${unsavedInterfaceCount > 1 ? 's' : ''} — save
+							host to bind to ${unsavedInterfaceCount > 1 ? 'them' : 'it'}.`;
+						} else {
+							return `${unsavedPortCount} unsaved port${unsavedPortCount > 1 ? 's' : ''} — save host to bind to
+							${unsavedPortCount > 1 ? 'them' : 'it'}.`;
+						}
+					})()}
+				/>
+			{/if}
 		</div>
 		<!-- Port Bindings -->
 		<div class="space-y-4">
@@ -326,7 +428,6 @@
 					allowItemRemove={() => true}
 					allowSelection={true}
 					allowReorder={false}
-					{formApi}
 					allowCreateNew={true}
 					itemClickAction="select"
 					allowAddFromOptions={false}
@@ -335,10 +436,19 @@
 					optionDisplayComponent={PortBindingDisplay}
 					itemDisplayComponent={PortBindingDisplay}
 					items={portBindings}
-					getItemContext={() => ({ service, host: host })}
+					getItemContext={() => ({
+						service,
+						host,
+						services: servicesData,
+						interfaces: host.interfaces,
+						ports: host.ports,
+						isContainerSubnet: isContainerSubnetFn
+					})}
 					onCreateNew={handleCreatePortBinding}
 					onRemove={handleRemovePortBinding}
 					onEdit={handleUpdatePortBinding}
+					onItemUpdate={(binding, index, updates) =>
+						handleUpdatePortBinding({ ...binding, ...updates }, index)}
 					bind:selectedItems={selectedPortBindings}
 				/>
 			{/key}
@@ -355,7 +465,6 @@
 					allowDuplicates={false}
 					allowItemEdit={() => true}
 					allowItemRemove={() => true}
-					{formApi}
 					allowReorder={false}
 					allowCreateNew={true}
 					allowAddFromOptions={false}
@@ -364,10 +473,18 @@
 					optionDisplayComponent={InterfaceBindingDisplay}
 					itemDisplayComponent={InterfaceBindingDisplay}
 					items={interfaceBindings}
-					getItemContext={() => ({ service, host: host })}
+					getItemContext={() => ({
+						service,
+						host,
+						services: servicesData,
+						interfaces: host.interfaces,
+						isContainerSubnet: isContainerSubnetFn
+					})}
 					onCreateNew={handleCreateInterfaceBinding}
 					onRemove={handleRemoveInterfaceBinding}
 					onEdit={handleUpdateInterfaceBinding}
+					onItemUpdate={(binding, index, updates) =>
+						handleUpdateInterfaceBinding({ ...binding, ...updates }, index)}
 				/>
 			{/key}
 		</div>

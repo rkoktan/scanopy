@@ -29,8 +29,26 @@
 		.map((id) => topology.groups.find((g) => g.id === id))
 		.filter((g) => g != undefined);
 
+	$: removedInterfaces = topology.removed_interfaces
+		.map((id) => topology.interfaces.find((i) => i.id === id))
+		.filter((i) => i != undefined);
+
+	$: removedPorts = topology.removed_ports
+		.map((id) => topology.ports.find((p) => p.id === id))
+		.filter((p) => p != undefined);
+
+	$: removedBindings = topology.removed_bindings
+		.map((id) => topology.bindings.find((b) => b.id === id))
+		.filter((b) => b != undefined);
+
 	$: totalRemoved =
-		removedHosts.length + removedServices.length + removedSubnets.length + removedGroups.length;
+		removedHosts.length +
+		removedServices.length +
+		removedSubnets.length +
+		removedGroups.length +
+		removedInterfaces.length +
+		removedPorts.length +
+		removedBindings.length;
 
 	// Build single list with category headers
 	$: allRemovedEntities = (() => {
@@ -64,6 +82,27 @@
 			});
 		}
 
+		if (removedInterfaces.length > 0) {
+			items.push({
+				id: 'interfaces-header',
+				name: `Interfaces: ${removedInterfaces.map((i) => i.ip_address).join(', ')}`
+			});
+		}
+
+		if (removedPorts.length > 0) {
+			items.push({
+				id: 'ports-header',
+				name: `Ports: ${removedPorts.map((p) => `${p.number}/${p.protocol}`).join(', ')}`
+			});
+		}
+
+		if (removedBindings.length > 0) {
+			items.push({
+				id: 'bindings-header',
+				name: `Bindings: ${removedBindings.length} removed`
+			});
+		}
+
 		return items;
 	})();
 </script>
@@ -73,7 +112,7 @@
 		<AlertTriangle class="h-6 w-6 text-red-600 dark:text-red-400" />
 	</svelte:fragment>
 
-	<div class="space-y-4">
+	<div class="space-y-4 p-6">
 		<!-- Warning header -->
 		<InlineDanger
 			title={`${totalRemoved} ${totalRemoved === 1 ? 'entity' : 'entities'} will be removed`}
