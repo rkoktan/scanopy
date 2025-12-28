@@ -1,6 +1,7 @@
-use crate::server::hosts::r#impl::interfaces::Interface;
-use crate::server::hosts::r#impl::ports::Port;
+use crate::server::bindings::r#impl::base::Binding;
+use crate::server::interfaces::r#impl::base::Interface;
 use crate::server::invites::r#impl::base::Invite;
+use crate::server::ports::r#impl::base::Port;
 use crate::server::services::r#impl::base::Service;
 use crate::server::shares::r#impl::base::Share;
 use crate::server::subnets::r#impl::base::Subnet;
@@ -16,7 +17,10 @@ use crate::server::{
     hosts::r#impl::base::Host,
     networks::r#impl::Network,
     organizations::r#impl::base::Organization,
-    shared::types::metadata::{EntityMetadataProvider, HasId},
+    shared::types::{
+        Color, Icon,
+        metadata::{EntityMetadataProvider, HasId},
+    },
     users::r#impl::base::User,
 };
 
@@ -53,11 +57,12 @@ pub enum Entity {
     Host(Host),
     Service(Service),
     Port(Port),
+    Binding(Binding),
     Interface(Interface),
 
     Subnet(Subnet),
     Group(Group),
-    Topology(Topology),
+    Topology(Box<Topology>),
 }
 
 impl HasId for EntityDiscriminants {
@@ -67,47 +72,49 @@ impl HasId for EntityDiscriminants {
 }
 
 impl EntityMetadataProvider for EntityDiscriminants {
-    fn color(&self) -> &'static str {
+    fn color(&self) -> Color {
         match self {
-            EntityDiscriminants::Organization => "blue",
-            EntityDiscriminants::Network => "gray",
-            EntityDiscriminants::Daemon => "green",
-            EntityDiscriminants::Discovery => "green",
-            EntityDiscriminants::ApiKey => "yellow",
-            EntityDiscriminants::User => "blue",
-            EntityDiscriminants::Invite => "green",
-            EntityDiscriminants::Share => "teal",
-            EntityDiscriminants::Tag => "yellow",
+            EntityDiscriminants::Organization => Color::Blue,
+            EntityDiscriminants::Network => Color::Gray,
+            EntityDiscriminants::Daemon => Color::Green,
+            EntityDiscriminants::Discovery => Color::Green,
+            EntityDiscriminants::ApiKey => Color::Yellow,
+            EntityDiscriminants::User => Color::Blue,
+            EntityDiscriminants::Invite => Color::Green,
+            EntityDiscriminants::Share => Color::Teal,
+            EntityDiscriminants::Tag => Color::Yellow,
 
-            EntityDiscriminants::Host => "blue",
-            EntityDiscriminants::Service => "purple",
-            EntityDiscriminants::Interface => "cyan",
-            EntityDiscriminants::Port => "cyan",
+            EntityDiscriminants::Host => Color::Blue,
+            EntityDiscriminants::Service => Color::Purple,
+            EntityDiscriminants::Interface => Color::Cyan,
+            EntityDiscriminants::Port => Color::Cyan,
+            EntityDiscriminants::Binding => Color::Purple,
 
-            EntityDiscriminants::Subnet => "orange",
-            EntityDiscriminants::Group => "rose",
-            EntityDiscriminants::Topology => "pink",
+            EntityDiscriminants::Subnet => Color::Orange,
+            EntityDiscriminants::Group => Color::Rose,
+            EntityDiscriminants::Topology => Color::Pink,
         }
     }
 
-    fn icon(&self) -> &'static str {
+    fn icon(&self) -> Icon {
         match self {
-            EntityDiscriminants::Organization => "Building",
-            EntityDiscriminants::Network => "Globe",
-            EntityDiscriminants::User => "User",
-            EntityDiscriminants::Tag => "Tag",
-            EntityDiscriminants::Invite => "UserPlus",
-            EntityDiscriminants::Share => "Share2",
-            EntityDiscriminants::ApiKey => "Key",
-            EntityDiscriminants::Daemon => "SatelliteDish",
-            EntityDiscriminants::Discovery => "Radar",
-            EntityDiscriminants::Host => "Server",
-            EntityDiscriminants::Service => "Layers",
-            EntityDiscriminants::Interface => "Binary",
-            EntityDiscriminants::Port => "EthernetPort",
-            EntityDiscriminants::Subnet => "Network",
-            EntityDiscriminants::Group => "Group",
-            EntityDiscriminants::Topology => "ChartNetwork",
+            EntityDiscriminants::Organization => Icon::Building,
+            EntityDiscriminants::Network => Icon::Globe,
+            EntityDiscriminants::User => Icon::User,
+            EntityDiscriminants::Tag => Icon::Tag,
+            EntityDiscriminants::Invite => Icon::UserPlus,
+            EntityDiscriminants::Share => Icon::Share2,
+            EntityDiscriminants::ApiKey => Icon::Key,
+            EntityDiscriminants::Daemon => Icon::SatelliteDish,
+            EntityDiscriminants::Discovery => Icon::Radar,
+            EntityDiscriminants::Host => Icon::Server,
+            EntityDiscriminants::Service => Icon::Layers,
+            EntityDiscriminants::Interface => Icon::Binary,
+            EntityDiscriminants::Port => Icon::EthernetPort,
+            EntityDiscriminants::Binding => Icon::Link,
+            EntityDiscriminants::Subnet => Icon::Network,
+            EntityDiscriminants::Group => Icon::Group,
+            EntityDiscriminants::Topology => Icon::ChartNetwork,
         }
     }
 }
@@ -178,6 +185,12 @@ impl From<Port> for Entity {
     }
 }
 
+impl From<Binding> for Entity {
+    fn from(value: Binding) -> Self {
+        Self::Binding(value)
+    }
+}
+
 impl From<Interface> for Entity {
     fn from(value: Interface) -> Self {
         Self::Interface(value)
@@ -198,7 +211,7 @@ impl From<Group> for Entity {
 
 impl From<Topology> for Entity {
     fn from(value: Topology) -> Self {
-        Self::Topology(value)
+        Self::Topology(Box::new(value))
     }
 }
 

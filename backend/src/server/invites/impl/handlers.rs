@@ -1,12 +1,14 @@
 use crate::server::{
+    config::AppState,
     invites::{r#impl::base::Invite, service::InviteService},
-    shared::handlers::traits::CrudHandlers,
+    shared::handlers::{query::NoFilterQuery, traits::CrudHandlers},
 };
 
 impl CrudHandlers for Invite {
     type Service = InviteService;
+    type FilterQuery = NoFilterQuery;
 
-    fn get_service(state: &crate::server::config::AppState) -> &Self::Service {
+    fn get_service(state: &AppState) -> &Self::Service {
         &state.services.invite_service
     }
 }

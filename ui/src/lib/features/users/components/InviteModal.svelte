@@ -1,5 +1,6 @@
 <script lang="ts">
-	import EditModal from '$lib/shared/components/forms/EditModal.svelte';
+	import { createForm } from '@tanstack/svelte-form';
+	import GenericModal from '$lib/shared/components/layout/GenericModal.svelte';
 	import ModalHeaderIcon from '$lib/shared/components/layout/ModalHeaderIcon.svelte';
 	import {
 		UserPlus,
@@ -14,33 +15,45 @@
 	import { formatTimestamp } from '$lib/shared/utils/formatting';
 	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import type { OrganizationInvite } from '$lib/features/organizations/types';
-	import { createInvite, formatInviteUrl } from '$lib/features/organizations/store';
+	import { formatInviteUrl, useCreateInviteMutation } from '$lib/features/organizations/queries';
 	import type { UserOrgPermissions } from '../types';
 	import SelectInput from '$lib/shared/components/forms/input/SelectInput.svelte';
-	import { field } from 'svelte-forms';
-	import { email, required } from 'svelte-forms/validators';
+	import { email } from '$lib/shared/components/forms/validators';
 	import { permissions, metadata, entities } from '$lib/shared/stores/metadata';
-	import { currentUser } from '$lib/features/auth/store';
+	import { useCurrentUserQuery } from '$lib/features/auth/queries';
 	import ListManager from '$lib/shared/components/forms/selection/ListManager.svelte';
-	import { networks } from '$lib/features/networks/store';
+	import { useNetworksQuery } from '$lib/features/networks/queries';
 	import { NetworkDisplay } from '$lib/shared/components/forms/selection/display/NetworkDisplay.svelte';
 	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
-	import { config } from '$lib/shared/stores/config';
+	import { useConfigQuery } from '$lib/shared/stores/config-query';
 	import type { Network } from '$lib/features/networks/types';
 
 	let { isOpen = $bindable(false), onClose }: { isOpen: boolean; onClose: () => void } = $props();
 
-	let enableEmail = $derived($config?.has_email_service ?? false);
+	// TanStack Query for current user
+	const currentUserQuery = useCurrentUserQuery();
+	let currentUser = $derived(currentUserQuery.data);
+
+	const networksQuery = useNetworksQuery();
+	let networksData = $derived(networksQuery.data ?? []);
+
+	// Mutation for creating invite
+	const createInviteMutation = useCreateInviteMutation();
+
+	const configQuery = useConfigQuery();
+	let configData = $derived(configQuery.data);
+
+	let enableEmail = $derived(configData?.has_email_service ?? false);
 
 	// Force Svelte to track reactivity
 	$effect(() => {
 		void $metadata;
-		void $currentUser;
+		void currentUser;
 	});
 
 	let copied = $state(false);
 	let copyTimeoutId = $state<ReturnType<typeof setTimeout> | null>(null);
-	let generatingInvite = $state(false);
+	let generatingInvite = $derived(createInviteMutation.isPending);
 	let invite = $state<OrganizationInvite | null>(null);
 
 	const networksNotNeeded: string[] = permissions
@@ -53,20 +66,31 @@
 		permissions
 			.getItems()
 			.filter((p) =>
-				$currentUser
+				currentUser
 					? permissions
-							.getMetadata($currentUser.permissions)
+							.getMetadata(currentUser.permissions)
 							.can_manage_user_permissions.includes(p.id)
 					: false
 			)
-			.map((p) => ({ value: p.id, label: p.name, description: p.description }))
+			.map((p) => ({ value: p.id, label: p.name ?? '', description: p.description ?? '' }))
 	);
 
-	// Create form field with validation
-	const permissionsField = field('permissions', 'Viewer', [required()]);
-	const emailField = field('email', '', [email()]);
+	// Create form
+	const form = createForm(() => ({
+		defaultValues: {
+			permissions: 'Viewer' as UserOrgPermissions,
+			email: ''
+		},
+		onSubmit: async () => {
+			// Not used - we handle submission with handleGenerateInvite
+		}
+	}));
 
-	let usingEmail = $derived(enableEmail && $emailField.value && $emailField.valid);
+	let permissionsValue = $derived(form.state.values.permissions);
+	let emailValue = $derived(form.state.values.email);
+	let emailValid = $derived(!emailValue || !email(emailValue));
+
+	let usingEmail = $derived(enableEmail && emailValue && emailValid);
 	let ctaText = $derived(usingEmail ? 'Send Invite Link' : 'Generate Invite Link');
 	let ctaLoadingText = $derived(usingEmail ? 'Sending...' : 'Generating...');
 	let CtaIcon = $derived(usingEmail ? Send : RotateCcw);
@@ -74,12 +98,12 @@
 	let selectedNetworks: Network[] = $state([]);
 
 	let networkOptions = $derived(
-		$networks
+		networksData
 			.filter((n) => {
-				if ($currentUser) {
-					return networksNotNeeded.includes($currentUser.permissions)
+				if (currentUser) {
+					return networksNotNeeded.includes(currentUser.permissions)
 						? true
-						: $currentUser.network_ids.includes(n.id);
+						: currentUser.network_ids.includes(n.id);
 				}
 				return false;
 			})
@@ -87,7 +111,7 @@
 	);
 
 	function handleAddNetwork(id: string) {
-		const network = $networks.find((n) => n.id == id);
+		const network = networksData.find((n) => n.id == id);
 		if (network) {
 			selectedNetworks.push(network);
 			selectedNetworks = [...selectedNetworks];
@@ -100,33 +124,32 @@
 	}
 
 	// Reset form when modal opens
-	$effect(() => {
-		if (isOpen && !invite) {
-			permissionsField.set('Viewer');
-		}
-	});
+	function handleOpen() {
+		form.reset({ permissions: 'Viewer', email: '' });
+		selectedNetworks = [];
+		invite = null;
+	}
 
 	function handleClose() {
 		invite = null;
-		emailField.clear();
 		onClose();
 	}
 
 	async function handleGenerateInvite() {
-		generatingInvite = true;
 		try {
-			invite = await createInvite(
-				$permissionsField.value as UserOrgPermissions,
-				selectedNetworks.map((n) => n.id),
-				$emailField.value
-			);
-			if (invite) {
-				pushSuccess(`Invite ${usingEmail ? 'sent' : 'generated'} successfully`);
-			}
+			// Read values directly from form state to ensure we get current values
+			const currentPermissions = form.state.values.permissions;
+			const currentEmail = form.state.values.email;
+
+			const result = await createInviteMutation.mutateAsync({
+				permissions: currentPermissions,
+				network_ids: selectedNetworks.map((n) => n.id),
+				email: currentEmail
+			});
+			invite = result;
+			pushSuccess(`Invite ${currentEmail ? 'sent' : 'generated'} successfully`);
 		} catch (err) {
-			pushError(`Failed to ${usingEmail ? 'send' : 'generate'} invite: ${err}`);
-		} finally {
-			generatingInvite = false;
+			pushError(`Failed to ${form.state.values.email ? 'send' : 'generate'} invite: ${err}`);
 		}
 	}
 
@@ -166,136 +189,155 @@
 	});
 </script>
 
-<EditModal
+<GenericModal
 	{isOpen}
 	title="Invite User"
-	showSave={false}
-	showCancel={true}
-	cancelLabel="Close"
-	onCancel={handleClose}
 	size="xl"
-	let:formApi
+	onClose={handleClose}
+	onOpen={handleOpen}
+	showCloseButton={true}
 >
 	<svelte:fragment slot="header-icon">
-		<ModalHeaderIcon Icon={UserPlus} color={entities.getColorHelper('User').icon} />
+		<ModalHeaderIcon Icon={UserPlus} color={entities.getColorHelper('User').color} />
 	</svelte:fragment>
 
-	<div class="space-y-6">
-		<p class="text-secondary text-sm">
-			Select the permissions level for the new user, then generate an invite link. They can use it
-			to register or join your organization.
-		</p>
-
-		<!-- Permissions Selection -->
-		<SelectInput
-			label="Permissions Level"
-			id="permissions"
-			{formApi}
-			field={permissionsField}
-			options={permissionOptions}
-			disabled={!!invite}
-			helpText="Choose the access level for the invited user"
-		/>
-
-		{#if !networksNotNeeded.includes($permissionsField.value as UserOrgPermissions)}
-			<ListManager
-				label="Networks"
-				helpText="Select networks this user will have access to"
-				required={true}
-				allowReorder={false}
-				allowAddFromOptions={true}
-				allowCreateNew={false}
-				allowItemEdit={() => false}
-				disableCreateNewButton={false}
-				onAdd={handleAddNetwork}
-				onRemove={handleRemoveNetwork}
-				options={networkOptions}
-				optionDisplayComponent={NetworkDisplay}
-				items={selectedNetworks}
-				itemDisplayComponent={NetworkDisplay}
-				{formApi}
-			/>
-		{:else}
-			<div class="card card-static">
+	<div class="flex min-h-0 flex-1 flex-col">
+		<div class="flex-1 overflow-auto p-6">
+			<div class="space-y-6">
 				<p class="text-secondary text-sm">
-					Users with {$permissionsField.value} permissions have access to all networks.
+					Select the permissions level for the new user, then generate an invite link. They can use
+					it to register or join your organization.
 				</p>
-			</div>
-		{/if}
 
-		{#if enableEmail}
-			<TextInput
-				label="Email"
-				id="name"
-				{formApi}
-				placeholder="Enter email address..."
-				helpText="Enter the email you would like to send this invite to, or leave empty to just generate a link"
-				field={emailField}
-			/>
-		{/if}
+				<!-- Permissions Selection -->
+				<form.Field name="permissions">
+					{#snippet children(field)}
+						<SelectInput
+							label="Permissions Level"
+							id="permissions"
+							{field}
+							options={permissionOptions}
+							disabled={!!invite}
+							helpText="Choose the access level for the invited user"
+						/>
+					{/snippet}
+				</form.Field>
 
-		<!-- Generate Invite Button (shown when no invite exists) -->
-		{#if !invite}
-			<button
-				onclick={handleGenerateInvite}
-				type="button"
-				disabled={generatingInvite || $emailField.invalid}
-				class="btn-primary w-full"
-			>
-				<CtaIcon class="mr-2 h-4 w-4" />
-				{generatingInvite ? ctaLoadingText : ctaText}
-			</button>
-		{/if}
-
-		<!-- Invite URL Card (shown when invite exists) -->
-		{#if invite}
-			<div class="card card-static">
-				<div class="space-y-3">
-					<div class="flex items-center gap-2">
-						<LinkIcon class="text-secondary h-4 w-4 flex-shrink-0" />
-						<h3 class="text-primary text-sm font-semibold">Invite Link</h3>
-					</div>
-
-					<!-- URL Display -->
-					<div class="rounded-md border border-gray-600 bg-gray-800/50 p-3">
-						<code class="text-primary block break-all text-sm">{formatInviteUrl(invite)}</code>
-					</div>
-
-					<!-- Copy Button -->
-					{#if isSecureContext}
-						<button onclick={handleCopy} type="button" class="btn-primary w-full" disabled={copied}>
-							{#if copied}
-								<Check class="mr-2 h-4 w-4" />
-								Copied!
-							{:else}
-								<Copy class="mr-2 h-4 w-4" />
-								Copy Link
-							{/if}
-						</button>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Expiration Info -->
-			<div class="card card-static">
-				<div class="flex items-center gap-3">
-					<div
-						class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/10"
-					>
-						<Calendar class="h-5 w-5 text-blue-400" />
-					</div>
-					<div class="flex-1">
-						<p class="text-primary text-sm font-medium">
-							{'Expires ' + formatTimestamp(invite.expires_at)}
+				{#if !networksNotNeeded.includes(permissionsValue)}
+					<ListManager
+						label="Networks"
+						helpText="Select networks this user will have access to"
+						required={true}
+						allowReorder={false}
+						allowAddFromOptions={true}
+						allowCreateNew={false}
+						allowItemEdit={() => false}
+						disableCreateNewButton={false}
+						onAdd={handleAddNetwork}
+						onRemove={handleRemoveNetwork}
+						options={networkOptions}
+						optionDisplayComponent={NetworkDisplay}
+						items={selectedNetworks}
+						itemDisplayComponent={NetworkDisplay}
+					/>
+				{:else}
+					<div class="card card-static">
+						<p class="text-secondary text-sm">
+							Users with {permissionsValue} permissions have access to all networks.
 						</p>
 					</div>
-				</div>
-			</div>
+				{/if}
 
-			<InlineWarning
-				title="Sensitive Link"
-				body="Anyone with this link can join your organization with {$permissionsField.value} permissions. Keep it secure and only share it with people you trust."
-			/>
-		{/if}
+				{#if enableEmail}
+					<form.Field name="email" validators={{ onBlur: ({ value }) => email(value) }}>
+						{#snippet children(field)}
+							<TextInput
+								label="Email"
+								id="email"
+								placeholder="Enter email address..."
+								helpText="Enter the email you would like to send this invite to, or leave empty to just generate a link"
+								{field}
+							/>
+						{/snippet}
+					</form.Field>
+				{/if}
+
+				<!-- Generate Invite Button (shown when no invite exists) -->
+				{#if !invite}
+					<button
+						onclick={handleGenerateInvite}
+						type="button"
+						disabled={generatingInvite || !emailValid}
+						class="btn-primary w-full"
+					>
+						<CtaIcon class="mr-2 h-4 w-4" />
+						{generatingInvite ? ctaLoadingText : ctaText}
+					</button>
+				{/if}
+
+				<!-- Invite URL Card (shown when invite exists) -->
+				{#if invite}
+					<div class="card card-static">
+						<div class="space-y-3">
+							<div class="flex items-center gap-2">
+								<LinkIcon class="text-secondary h-4 w-4 flex-shrink-0" />
+								<h3 class="text-primary text-sm font-semibold">Invite Link</h3>
+							</div>
+
+							<!-- URL Display -->
+							<div class="rounded-md border border-gray-600 bg-gray-800/50 p-3">
+								<code class="text-primary block break-all text-sm">{formatInviteUrl(invite)}</code>
+							</div>
+
+							<!-- Copy Button -->
+							{#if isSecureContext}
+								<button
+									onclick={handleCopy}
+									type="button"
+									class="btn-primary w-full"
+									disabled={copied}
+								>
+									{#if copied}
+										<Check class="mr-2 h-4 w-4" />
+										Copied!
+									{:else}
+										<Copy class="mr-2 h-4 w-4" />
+										Copy Link
+									{/if}
+								</button>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Expiration Info -->
+					<div class="card card-static">
+						<div class="flex items-center gap-3">
+							<div
+								class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/10"
+							>
+								<Calendar class="h-5 w-5 text-blue-400" />
+							</div>
+							<div class="flex-1">
+								<p class="text-primary text-sm font-medium">
+									{'Expires ' + formatTimestamp(invite.expires_at)}
+								</p>
+							</div>
+						</div>
+					</div>
+
+					<InlineWarning
+						title="Sensitive Link"
+						body="Anyone with this link can join your organization with {permissionsValue} permissions. Keep it secure and only share it with people you trust."
+					/>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Footer -->
+		<div class="modal-footer">
+			<div class="flex items-center justify-end gap-3">
+				<button type="button" onclick={handleClose} class="btn-secondary"> Close </button>
+			</div>
+		</div>
 	</div>
-</EditModal>
+</GenericModal>

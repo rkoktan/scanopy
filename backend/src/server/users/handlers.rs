@@ -1,11 +1,9 @@
 use crate::server::auth::middleware::auth::AuthenticatedUser;
 use crate::server::auth::middleware::features::{BlockedInDemoMode, RequireFeature};
 use crate::server::auth::middleware::permissions::{RequireAdmin, RequireMember};
-use crate::server::shared::handlers::traits::{
-    BulkDeleteResponse, CrudHandlers, bulk_delete_handler, delete_handler, get_by_id_handler,
-};
+use crate::server::shared::handlers::traits::{BulkDeleteResponse, CrudHandlers, delete_handler};
 use crate::server::shared::storage::filter::EntityFilter;
-use crate::server::shared::types::api::ApiError;
+use crate::server::shared::types::api::{ApiError, ApiErrorResponse, EmptyApiResponse};
 use crate::server::users::r#impl::base::User;
 use crate::server::users::r#impl::permissions::UserOrgPermissions;
 use crate::server::{
@@ -17,29 +15,74 @@ use crate::server::{
 };
 use anyhow::anyhow;
 use axum::extract::Path;
-use axum::routing::{delete, get, post, put};
-use axum::{Router, extract::State, response::Json};
+use axum::extract::State;
+use axum::response::Json;
 use std::sync::Arc;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", get(get_all_users))
-        .route("/{id}", put(update_user))
-        .route("/{id}/admin", put(admin_update_user))
-        .route("/{id}", delete(delete_user))
-        .route("/{id}", get(get_by_id_handler::<User>))
-        .route("/bulk-delete", post(bulk_delete_users))
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(get_all_users))
+        .routes(routes!(get_user_by_id, update_user, delete_user))
+        .routes(routes!(admin_update_user))
+        .routes(routes!(bulk_delete_users))
 }
 
+/// Get user by ID
+#[utoipa::path(
+    get,
+    path = "/{id}",
+    tag = "users",
+    params(("id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User found", body = ApiResponse<User>),
+        (status = 404, description = "User not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+pub async fn get_user_by_id(
+    State(state): State<Arc<AppState>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<ApiResponse<User>>> {
+    let service = User::get_service(&state);
+
+    let mut user = service
+        .get_by_id(&id)
+        .await
+        .map_err(|e| ApiError::internal_error(&e.to_string()))?
+        .ok_or_else(|| ApiError::not_found(format!("User '{}' not found", id)))?;
+
+    // Hydrate network_ids from junction table
+    state
+        .services
+        .user_service
+        .hydrate_network_ids(&mut user)
+        .await
+        .map_err(|e| ApiError::internal_error(&e.to_string()))?;
+
+    Ok(Json(ApiResponse::success(user)))
+}
+
+/// List all users
+#[utoipa::path(
+    get,
+    path = "",
+    tag = "users",
+    responses(
+        (status = 200, description = "List of users", body = ApiResponse<Vec<User>>),
+    ),
+    security(("session" = []))
+)]
 pub async fn get_all_users(
     State(state): State<Arc<AppState>>,
-    RequireMember(user): RequireMember,
+    RequireAdmin(user): RequireAdmin,
 ) -> ApiResult<Json<ApiResponse<Vec<User>>>> {
     let org_filter = EntityFilter::unfiltered().organization_id(&user.organization_id);
 
     let service = User::get_service(&state);
-    let users = service
+    let mut users: Vec<User> = service
         .get_all(org_filter)
         .await
         .map_err(|e| ApiError::internal_error(&e.to_string()))?
@@ -52,9 +95,31 @@ pub async fn get_all_users(
         .cloned()
         .collect();
 
+    // Hydrate network_ids from junction table
+    state
+        .services
+        .user_service
+        .hydrate_network_ids_batch(&mut users)
+        .await
+        .map_err(|e| ApiError::internal_error(&e.to_string()))?;
+
     Ok(Json(ApiResponse::success(users)))
 }
 
+/// Delete a user
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    tag = "users",
+    params(("id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User deleted", body = EmptyApiResponse),
+        (status = 404, description = "User not found", body = ApiErrorResponse),
+        (status = 403, description = "Cannot delete user with higher permissions", body = ApiErrorResponse),
+        (status = 409, description = "Cannot delete the only owner", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn delete_user(
     state: State<Arc<AppState>>,
     require_admin: RequireAdmin,
@@ -90,6 +155,20 @@ pub async fn delete_user(
     delete_handler::<User>(state, require_admin.into(), id).await
 }
 
+/// Update your own user record
+#[utoipa::path(
+    put,
+    path = "/{id}",
+    tags = ["users", "internal"],
+    params(("id" = Uuid, Path, description = "User ID")),
+    request_body = User,
+    responses(
+        (status = 200, description = "User updated", body = ApiResponse<User>),
+        (status = 403, description = "Cannot update another user's record", body = ApiErrorResponse),
+        (status = 404, description = "User not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn update_user(
     State(state): State<Arc<AppState>>,
     user: AuthenticatedUser,
@@ -136,7 +215,21 @@ pub async fn update_user(
     Ok(Json(ApiResponse::success(updated)))
 }
 
-pub async fn admin_update_user(
+/// Admin update user (for changing permissions)
+#[utoipa::path(
+    put,
+    path = "/{id}/admin",
+    tags = ["users", "internal"],
+    params(("id" = Uuid, Path, description = "User ID")),
+    request_body = User,
+    responses(
+        (status = 200, description = "User updated", body = ApiResponse<User>),
+        (status = 403, description = "Cannot update user with higher permissions", body = ApiErrorResponse),
+        (status = 404, description = "User not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+async fn admin_update_user(
     State(state): State<Arc<AppState>>,
     RequireAdmin(admin): RequireAdmin,
     _demo_check: RequireFeature<BlockedInDemoMode>,
@@ -189,20 +282,45 @@ pub async fn admin_update_user(
     request.base.oidc_subject = existing.base.oidc_subject.clone();
     request.base.oidc_linked_at = existing.base.oidc_linked_at;
 
+    // Capture network_ids before update (they're stored in junction table, not user record)
+    let network_ids = request.base.network_ids.clone();
+
     let updated = service
         .update(&mut request, admin.into())
+        .await
+        .map_err(|e| ApiError::internal_error(&e.to_string()))?;
+
+    // Persist network_ids to the junction table
+    state
+        .services
+        .user_service
+        .set_network_ids(&id, &network_ids)
         .await
         .map_err(|e| ApiError::internal_error(&e.to_string()))?;
 
     Ok(Json(ApiResponse::success(updated)))
 }
 
+/// Bulk delete users
+#[utoipa::path(
+    post,
+    path = "/bulk-delete",
+    tag = "users",
+    request_body(content = Vec<Uuid>, description = "Array of user IDs to delete"),
+    responses(
+        (status = 200, description = "Users deleted successfully", body = ApiResponse<BulkDeleteResponse>),
+        (status = 403, description = "Cannot delete users with higher permissions", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn bulk_delete_users(
     State(state): State<Arc<AppState>>,
-    RequireMember(user): RequireMember,
+    RequireAdmin(user): RequireAdmin,
     _demo_check: RequireFeature<BlockedInDemoMode>,
     Json(ids): Json<Vec<Uuid>>,
 ) -> ApiResult<Json<ApiResponse<BulkDeleteResponse>>> {
+    use crate::server::shared::handlers::traits::bulk_delete_handler;
+
     let user_filter = EntityFilter::unfiltered().entity_ids(&ids);
     let users = state.services.user_service.get_all(user_filter).await?;
 

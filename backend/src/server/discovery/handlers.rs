@@ -10,50 +10,77 @@ use crate::server::{
         types::{DiscoveryType, RunType},
     },
     shared::{
-        handlers::traits::{
-            bulk_delete_handler, create_handler, delete_handler, get_all_handler,
-            get_by_id_handler, update_handler,
-        },
+        handlers::traits::{create_handler, update_handler},
         services::traits::CrudService,
-        types::api::{ApiError, ApiResponse, ApiResult},
+        types::api::{ApiError, ApiErrorResponse, ApiResponse, ApiResult, EmptyApiResponse},
     },
 };
 use axum::{
-    Router,
     extract::{Path, State},
     response::{
         Json, Sse,
         sse::{Event, KeepAlive},
     },
-    routing::{delete, get, post, put},
+    routing::get,
 };
 use chrono::Utc;
 use futures::Stream;
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::broadcast;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", post(create_discovery))
-        .route("/", get(get_all_handler::<Discovery>))
-        .route("/{id}", put(update_handler::<Discovery>))
-        .route("/{id}", delete(delete_handler::<Discovery>))
-        .route("/bulk-delete", post(bulk_delete_handler::<Discovery>))
-        .route("/{id}", get(get_by_id_handler::<Discovery>))
-        .route("/start-session", post(start_session))
-        .route("/active-sessions", get(get_active_sessions))
-        .route("/{session_id}/cancel", post(cancel_discovery))
-        .route("/{session_id}/update", post(receive_discovery_update))
+// Generated handlers for operations that use generic CRUD logic
+mod generated {
+    use super::*;
+    crate::crud_get_all_handler!(Discovery, "discoveries", "discovery");
+    crate::crud_get_by_id_handler!(Discovery, "discoveries", "discovery");
+    crate::crud_delete_handler!(Discovery, "discoveries", "discovery");
+    crate::crud_bulk_delete_handler!(Discovery, "discoveries");
+}
+
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(generated::get_all, create_discovery))
+        .routes(routes!(
+            generated::get_by_id,
+            update_discovery,
+            generated::delete
+        ))
+        .routes(routes!(generated::bulk_delete))
+        .routes(routes!(start_session))
+        .routes(routes!(get_active_sessions))
+        .routes(routes!(cancel_discovery))
+        // Internal daemon endpoints
+        .routes(routes!(receive_discovery_update))
+        // SSE endpoint (internal - not well-supported by OpenAPI)
         .route("/stream", get(discovery_stream))
 }
 
-/// Create a new discovery with subnet network validation
+/// Create new discovery
+#[utoipa::path(
+    post,
+    path = "",
+    tag = "discoveries",
+    request_body = Discovery,
+    responses(
+        (status = 200, description = "Discovery created successfully", body = ApiResponse<Discovery>),
+        (status = 400, description = "Invalid subnet network", body = ApiErrorResponse),
+        (status = 400, description = "Can't create historical discovery", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 pub async fn create_discovery(
     State(state): State<Arc<AppState>>,
     user: RequireMember,
     Json(discovery): Json<Discovery>,
 ) -> ApiResult<Json<ApiResponse<Discovery>>> {
+    if let RunType::Historical { .. } = discovery.base.run_type {
+        return Err(ApiError::bad_request(
+            "Historial discovery is created when a discovery session completes, and can't be created using the API.",
+        ));
+    }
+
     // Custom validation: Check if any subnets aren't on the same network as the discovery
     #[allow(clippy::single_match)]
     match &discovery.base.discovery_type {
@@ -76,7 +103,49 @@ pub async fn create_discovery(
     create_handler::<Discovery>(State(state), user, Json(discovery)).await
 }
 
+/// Update discovery
+#[utoipa::path(
+    put,
+    path = "/{id}",
+    tag = "discoveries",
+    params(("id" = uuid::Uuid, Path, description = "Discovery ID")),
+    request_body = Discovery,
+    responses(
+        (status = 200, description = "Discovery updated successfully", body = ApiResponse<Discovery>),
+        (status = 400, description = "Invalid subnet network", body = ApiErrorResponse),
+        (status = 400, description = "Can't update historical discovery", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+pub async fn update_discovery(
+    state: State<Arc<AppState>>,
+    user: RequireMember,
+    id: Path<Uuid>,
+    discovery: Json<Discovery>,
+) -> ApiResult<Json<ApiResponse<Discovery>>> {
+    if let RunType::Historical { .. } = discovery.base.run_type {
+        return Err(ApiError::bad_request(
+            "Historial discovery can't be updated using the API.",
+        ));
+    }
+
+    update_handler::<Discovery>(state, user, id, discovery).await
+}
+
 /// Receive discovery progress update from daemon
+///
+/// Internal endpoint for daemons to report discovery progress.
+#[utoipa::path(
+    post,
+    path = "/{session_id}/update",
+    tags = ["discovery", "internal"],
+    params(("session_id" = Uuid, Path, description = "Discovery session ID")),
+    request_body = DiscoveryUpdatePayload,
+    responses(
+        (status = 200, description = "Update received", body = EmptyApiResponse),
+    ),
+    security(("api_key" = []))
+)]
 async fn receive_discovery_update(
     State(state): State<Arc<AppState>>,
     _daemon: AuthenticatedDaemon,
@@ -92,7 +161,18 @@ async fn receive_discovery_update(
     Ok(Json(ApiResponse::success(())))
 }
 
-/// Endpoint to start a discovery session
+/// Start a discovery session
+#[utoipa::path(
+    post,
+    path = "/start-session",
+    tag = "discoveries",
+    request_body = Uuid,
+    responses(
+        (status = 200, description = "Discovery session started", body = ApiResponse<DiscoveryUpdatePayload>),
+        (status = 404, description = "Discovery not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
 async fn start_session(
     State(state): State<Arc<AppState>>,
     RequireMember(user): RequireMember,
@@ -162,7 +242,16 @@ async fn discovery_stream(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
-/// Get the latest payload from active discovery sessions
+/// Get active discovery sessions
+#[utoipa::path(
+    get,
+    path = "/active-sessions",
+    tag = "discoveries",
+    responses(
+        (status = 200, description = "List of active discovery sessions", body = ApiResponse<Vec<DiscoveryUpdatePayload>>),
+    ),
+    security(("session" = []))
+)]
 async fn get_active_sessions(
     State(state): State<Arc<AppState>>,
     RequireMember(user): RequireMember,
@@ -176,7 +265,17 @@ async fn get_active_sessions(
     Ok(Json(ApiResponse::success(sessions)))
 }
 
-/// Cancel an active discovery session
+/// Cancel a discovery session
+#[utoipa::path(
+    post,
+    path = "/{session_id}/cancel",
+    tag = "discoveries",
+    params(("session_id" = Uuid, Path, description = "Session ID")),
+    responses(
+        (status = 200, description = "Discovery session cancelled", body = EmptyApiResponse),
+    ),
+    security(("session" = []))
+)]
 async fn cancel_discovery(
     State(state): State<Arc<AppState>>,
     RequireMember(user): RequireMember,

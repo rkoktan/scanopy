@@ -1,15 +1,19 @@
 <script lang="ts">
-	import EditModal from '$lib/shared/components/forms/EditModal.svelte';
-	import { required } from 'svelte-forms/validators';
+	import { createForm } from '@tanstack/svelte-form';
+	import { submitForm } from '$lib/shared/components/forms/form-context';
+	import {
+		required,
+		email,
+		password as passwordValidator,
+		confirmPasswordMatch
+	} from '$lib/shared/components/forms/validators';
+	import GenericModal from '$lib/shared/components/layout/GenericModal.svelte';
 	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
 	import Password from '$lib/shared/components/forms/input/Password.svelte';
-	import { field } from 'svelte-forms';
 	import InlineInfo from '$lib/shared/components/feedback/InlineInfo.svelte';
 	import InlineSuccess from '$lib/shared/components/feedback/InlineSuccess.svelte';
-	import { emailValidator } from '$lib/shared/components/forms/validators';
 	import Checkbox from '$lib/shared/components/forms/input/Checkbox.svelte';
-	import { config, getConfig } from '$lib/shared/stores/config';
-	import { loadData } from '$lib/shared/utils/dataLoader';
+	import { useConfigQuery } from '$lib/shared/stores/config-query';
 	import { onboardingStore } from '../stores/onboarding';
 	import type { RegisterRequest } from '../types/base';
 
@@ -27,20 +31,21 @@
 		onClose: () => void;
 	} = $props();
 
-	const loading = loadData([getConfig]);
 	let registering = $state(false);
 
-	let oidcProviders = $derived($loading ? [] : ($config?.oidc_providers ?? []));
+	const configQuery = useConfigQuery();
+	let configData = $derived(configQuery.data);
+
+	let oidcProviders = $derived(configData?.oidc_providers ?? []);
 	let hasOidcProviders = $derived(oidcProviders.length > 0);
-	let enableEmailOptIn = $derived($loading ? false : ($config?.has_email_opt_in ?? false));
-	let enableTermsCheckbox = $derived($loading ? false : ($config?.billing_enabled ?? false));
+	let enableEmailOptIn = $derived(configData?.has_email_opt_in ?? false);
+	let enableTermsCheckbox = $derived(configData?.billing_enabled ?? false);
 
 	// Get networks with daemon setups that will scan after registration
 	let networksWithDaemons = $derived.by(() => {
 		const networks = $onboardingStore.networks;
 		const daemonSetups = $onboardingStore.daemonSetups;
 
-		// Find networks where user chose to install a daemon (installNow = true)
 		return networks.filter((n) => {
 			if (!n.id) return false;
 			const setup = daemonSetups.get(n.id);
@@ -51,84 +56,69 @@
 	let hasPendingDaemons = $derived(networksWithDaemons.length > 0);
 	let pendingNetworkNames = $derived(networksWithDaemons.map((n) => n.name).join(', '));
 
-	let formData: RegisterRequest & { confirmPassword: string } = $state({
-		email: '',
-		password: '',
-		confirmPassword: '',
-		subscribed: true,
-		terms_accepted: false
-	});
-
-	const subscribedField = field('subscribed', true, []);
-	const termsField = field('terms', false, []);
-
-	// Create form fields with validation
-	const email = field('email', '', [required(), emailValidator()]);
-
-	// Update formData when field values change
-	$effect(() => {
-		formData.email = $email.value;
-	});
+	// Create form
+	const form = createForm(() => ({
+		defaultValues: {
+			email: '',
+			password: '',
+			confirmPassword: '',
+			subscribed: true,
+			terms_accepted: false
+		},
+		onSubmit: async ({ value }) => {
+			registering = true;
+			try {
+				await onRegister(
+					{
+						email: value.email.trim(),
+						password: value.password,
+						terms_accepted: enableTermsCheckbox && value.terms_accepted
+					},
+					value.subscribed
+				);
+			} finally {
+				registering = false;
+			}
+		}
+	}));
 
 	// Reset form when modal opens
-	$effect(() => {
-		if (isOpen) {
-			resetForm();
-		}
-	});
+	function handleOpen() {
+		form.reset({
+			email: '',
+			password: '',
+			confirmPassword: '',
+			subscribed: true,
+			terms_accepted: false
+		});
+	}
 
 	function handleOidcRegister(providerSlug: string) {
 		// Store subscribed preference for post-registration Plunk tracking
-		if ($subscribedField.value) {
+		if (form.state.values.subscribed) {
 			sessionStorage.setItem('pendingPlunkRegistration', 'true');
 		}
 
 		const returnUrl = encodeURIComponent(window.location.origin);
-		window.location.href = `/api/auth/oidc/${providerSlug}/authorize?flow=register&return_url=${returnUrl}&terms_accepted=${enableTermsCheckbox && $termsField.value}`;
-	}
-
-	function resetForm() {
-		formData = {
-			email: '',
-			password: '',
-			confirmPassword: '',
-			terms_accepted: false
-		};
+		window.location.href = `/api/auth/oidc/${providerSlug}/authorize?flow=register&return_url=${returnUrl}&terms_accepted=${enableTermsCheckbox && form.state.values.terms_accepted}`;
 	}
 
 	async function handleSubmit() {
-		registering = true;
-		try {
-			await onRegister(
-				{
-					email: formData.email,
-					password: formData.password,
-					terms_accepted: enableTermsCheckbox && $termsField.value
-				},
-				$subscribedField.value
-			);
-		} finally {
-			registering = false;
-		}
+		await submitForm(form);
 	}
 </script>
 
-<EditModal
+<GenericModal
 	{isOpen}
 	title="Create your account"
-	loading={registering || $loading}
-	centerTitle={true}
-	saveLabel="Create Account"
-	showCancel={false}
-	showCloseButton={false}
-	onSave={handleSubmit}
-	showBackdrop={false}
-	onCancel={onClose}
 	size="md"
+	{onClose}
+	onOpen={handleOpen}
+	showCloseButton={false}
+	showBackdrop={false}
 	preventCloseOnClickOutside={true}
-	let:formApi
+	centerTitle={true}
 >
-	<!-- Header icon -->
 	<svelte:fragment slot="header-icon">
 		<img
 			src="https://cdn.jsdelivr.net/gh/scanopy/website@main/static/scanopy-logo.png"
@@ -137,109 +127,143 @@
 		/>
 	</svelte:fragment>
 
-	{#if orgName && invitedBy}
-		<div class="mb-6">
-			<InlineInfo
-				title="You're invited!"
-				body={`You have been invited to join ${orgName} by ${invitedBy}. Please sign in or register to continue.`}
-			/>
-		</div>
-	{/if}
-
-	{#if hasPendingDaemons}
-		<div class="mb-6">
-			<InlineSuccess
-				title="Ready to scan"
-				body={networksWithDaemons.length === 1
-					? `Once installed, your daemon for "${pendingNetworkNames}" will begin scanning, and your visualization will start building, after you register.`
-					: `Once installed, your daemons for "${pendingNetworkNames}" will begin scanning, and your visualization will start building, after you register.`}
-			/>
-		</div>
-	{/if}
-
-	<!-- Content -->
-	<div class="space-y-6">
-		<TextInput
-			label="Email"
-			id="email"
-			{formApi}
-			placeholder="Enter your email"
-			required={true}
-			field={email}
-		/>
-
-		<Password
-			{formApi}
-			bind:value={formData.password}
-			bind:confirmValue={formData.confirmPassword}
-			showConfirm={true}
-		/>
-	</div>
-
-	<!-- Custom footer -->
-	<svelte:fragment slot="footer" let:formApi>
-		<div class="flex w-full flex-col gap-4">
-			<div class="flex flex-grow flex-col items-center gap-2">
-				{#if enableTermsCheckbox}
-					<Checkbox
-						label="I agree to the <a class='text-link' target='_blank' href='https://scanopy.net/terms'>terms</a> and <a target='_blank' class='text-link'href='https://scanopy.net/privacy'>privacy policy</a>"
-						helpText=""
-						{formApi}
-						required={true}
-						field={termsField}
-						id="terms"
+	<form
+		onsubmit={(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			handleSubmit();
+		}}
+		class="flex min-h-0 flex-1 flex-col"
+	>
+		<div class="flex-1 overflow-auto p-6">
+			{#if orgName && invitedBy}
+				<div class="mb-6">
+					<InlineInfo
+						title="You're invited!"
+						body={`You have been invited to join ${orgName} by ${invitedBy}. Please sign in or register to continue.`}
 					/>
-				{/if}
-			</div>
-
-			<!-- Create Account Button (type="submit" triggers form validation) -->
-			<button
-				type="submit"
-				disabled={registering || (enableTermsCheckbox && !$termsField.value)}
-				class="btn-primary w-full"
-			>
-				{registering ? 'Creating account...' : 'Create Account with Email'}
-			</button>
-
-			<!-- OIDC Providers -->
-			{#if hasOidcProviders}
-				<div class="relative">
-					<div class="absolute inset-0 flex items-center">
-						<div class="w-full border-t border-gray-600"></div>
-					</div>
-					<div class="relative flex justify-center text-sm">
-						<span class="bg-gray-900 px-2 text-gray-400">or</span>
-					</div>
-				</div>
-
-				<div class="space-y-2">
-					{#each oidcProviders as provider (provider.slug)}
-						<button
-							onclick={() => handleOidcRegister(provider.slug)}
-							disabled={enableTermsCheckbox && !$termsField.value}
-							type="button"
-							class="btn-secondary flex w-full items-center justify-center gap-3"
-						>
-							{#if provider.logo}
-								<img src={provider.logo} alt={provider.name} class="h-5 w-5" />
-							{/if}
-							Create Account with {provider.name}
-						</button>
-					{/each}
 				</div>
 			{/if}
 
-			<div class="flex flex-grow flex-col items-center gap-2">
-				{#if enableEmailOptIn}
-					<Checkbox
-						field={subscribedField}
-						label="Sign up for product updates via email"
-						{formApi}
-						id="subscribe"
-						helpText=""
+			{#if hasPendingDaemons}
+				<div class="mb-6">
+					<InlineSuccess
+						title="You're all set"
+						body={networksWithDaemons.length === 1
+							? `Register to finish setup. Your daemon will begin scanning "${pendingNetworkNames}" and populating your network map.`
+							: `Register to finish setup. Your daemons will begin scanning "${pendingNetworkNames}" and populating your network map.`}
 					/>
-				{/if}
+				</div>
+			{/if}
+
+			<div class="space-y-6">
+				<form.Field
+					name="email"
+					validators={{
+						onBlur: ({ value }) => required(value) || email(value)
+					}}
+				>
+					{#snippet children(field)}
+						<TextInput label="Email" id="email" {field} placeholder="Enter your email" required />
+					{/snippet}
+				</form.Field>
+
+				<form.Field
+					name="password"
+					validators={{
+						onBlur: ({ value }) => required(value) || passwordValidator(value)
+					}}
+				>
+					{#snippet children(passwordField)}
+						<form.Field
+							name="confirmPassword"
+							validators={{
+								onBlur: ({ value, fieldApi }) =>
+									required(value) ||
+									confirmPasswordMatch(() => fieldApi.form.getFieldValue('password'))(value)
+							}}
+						>
+							{#snippet children(confirmPasswordField)}
+								<Password {passwordField} {confirmPasswordField} required={true} />
+							{/snippet}
+						</form.Field>
+					{/snippet}
+				</form.Field>
 			</div>
 		</div>
-	</svelte:fragment>
-</EditModal>
+
+		<!-- Footer -->
+		<div class="modal-footer">
+			<form.Subscribe selector={(state) => state.values.terms_accepted}>
+				{#snippet children(termsAccepted)}
+					<div class="flex w-full flex-col gap-4">
+						<div class="flex flex-grow flex-col items-center gap-2">
+							{#if enableTermsCheckbox}
+								<form.Field name="terms_accepted">
+									{#snippet children(field)}
+										<Checkbox
+											label="I agree to the <a class='text-link' target='_blank' href='https://scanopy.net/terms'>terms</a> and <a target='_blank' class='text-link' href='https://scanopy.net/privacy'>privacy policy</a>"
+											helpText=""
+											{field}
+											id="terms"
+										/>
+									{/snippet}
+								</form.Field>
+							{/if}
+						</div>
+
+						<button
+							type="submit"
+							disabled={registering || (enableTermsCheckbox && !termsAccepted)}
+							class="btn-primary w-full"
+						>
+							{registering ? 'Creating account...' : 'Create Account with Email'}
+						</button>
+
+						{#if hasOidcProviders}
+							<div class="relative">
+								<div class="absolute inset-0 flex items-center">
+									<div class="w-full border-t border-gray-600"></div>
+								</div>
+								<div class="relative flex justify-center text-sm">
+									<span class="bg-gray-900 px-2 text-gray-400">or</span>
+								</div>
+							</div>
+
+							<div class="space-y-2">
+								{#each oidcProviders as provider (provider.slug)}
+									<button
+										onclick={() => handleOidcRegister(provider.slug)}
+										disabled={enableTermsCheckbox && !termsAccepted}
+										type="button"
+										class="btn-secondary flex w-full items-center justify-center gap-3"
+									>
+										{#if provider.logo}
+											<img src={provider.logo} alt={provider.name} class="h-5 w-5" />
+										{/if}
+										Create Account with {provider.name}
+									</button>
+								{/each}
+							</div>
+						{/if}
+
+						<div class="flex flex-grow flex-col items-center gap-2">
+							{#if enableEmailOptIn}
+								<form.Field name="subscribed">
+									{#snippet children(field)}
+										<Checkbox
+											{field}
+											label="Sign up for product updates via email"
+											id="subscribe"
+											helpText=""
+										/>
+									{/snippet}
+								</form.Field>
+							{/if}
+						</div>
+					</div>
+				{/snippet}
+			</form.Subscribe>
+		</div>
+	</form>
+</GenericModal>

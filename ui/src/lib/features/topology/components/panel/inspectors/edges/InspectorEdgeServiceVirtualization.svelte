@@ -3,19 +3,29 @@
 	import EntityDisplayWrapper from '$lib/shared/components/forms/selection/display/EntityDisplayWrapper.svelte';
 	import { ServiceDisplay } from '$lib/shared/components/forms/selection/display/ServiceDisplay.svelte';
 	import { SubnetDisplay } from '$lib/shared/components/forms/selection/display/SubnetDisplay.svelte';
-	import { topology as globalTopology, topologyOptions } from '$lib/features/topology/store';
+	import { useTopologiesQuery } from '$lib/features/topology/queries';
+	import { topology as selectedTopology, topologyOptions } from '$lib/features/topology/store';
 	import type { Topology } from '$lib/features/topology/types/base';
 	import { HostDisplay } from '$lib/shared/components/forms/selection/display/HostDisplay.svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { Subnet } from '$lib/features/subnets/types/base';
 	import { getContext } from 'svelte';
 	import type { Writable } from 'svelte/store';
+	import { useServicesQuery } from '$lib/features/services/queries';
 
 	let { edge, containerizingServiceId }: { edge: Edge; containerizingServiceId: string } = $props();
 
-	// Try to get topology from context (for share/embed pages), fallback to global store
+	// Try to get topology from context (for share/embed pages), fallback to query + selected topology
 	const topologyContext = getContext<Writable<Topology> | undefined>('topology');
-	let topology = $derived(topologyContext ? $topologyContext : $globalTopology);
+	const topologiesQuery = useTopologiesQuery();
+	const servicesQuery = useServicesQuery();
+	let servicesData = $derived(servicesQuery.data ?? []);
+	let topologiesData = $derived(topologiesQuery.data ?? []);
+	let topology = $derived(
+		topologyContext
+			? $topologyContext
+			: (topologiesData.find((t) => t.id === $selectedTopology?.id) ?? $selectedTopology)
+	);
 
 	let containerizingService = $derived(
 		topology ? topology.services.find((s) => s.id == containerizingServiceId) : null
@@ -47,11 +57,7 @@
 	// Helper to get interface from topology
 	function getInterfaceFromTopology(ifaceId: string) {
 		if (!topology) return null;
-		for (const host of topology.hosts) {
-			const iface = host.interfaces.find((i) => i.id === ifaceId);
-			if (iface) return iface;
-		}
-		return null;
+		return topology.interfaces.find((i) => i.id === ifaceId) ?? null;
 	}
 
 	// Helper to get subnet from topology
@@ -71,7 +77,7 @@
 				if (binding.type === 'Interface') {
 					ifaceId = binding.interface_id;
 				} else if (binding.type === 'Port') {
-					ifaceId = binding.interface_id;
+					ifaceId = binding.interface_id ?? null;
 				}
 
 				if (!ifaceId) continue;
@@ -94,7 +100,15 @@
 	{#if containerizingHost}
 		<span class="text-secondary mb-2 block text-sm font-medium">Docker Host</span>
 		<div class="card">
-			<EntityDisplayWrapper context={{}} item={containerizingHost} displayComponent={HostDisplay} />
+			<EntityDisplayWrapper
+				context={{
+					services: servicesData.filter((s) =>
+						containerizingHost ? s.host_id == containerizingHost.id : false
+					)
+				}}
+				item={containerizingHost}
+				displayComponent={HostDisplay}
+			/>
 		</div>
 	{/if}
 	{#if containerizingService}

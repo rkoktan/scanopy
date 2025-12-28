@@ -1,30 +1,32 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { get } from 'svelte/store';
-import { organization } from '$lib/features/organizations/store';
-import { config } from '$lib/shared/stores/config';
+import { queryClient, queryKeys } from '$lib/api/query-client';
+import type { Organization } from '$lib/features/organizations/types';
+import type { PublicServerConfig } from '$lib/shared/stores/config-query';
 import { isBillingPlanActive } from '$lib/features/organizations/types';
 
 /**
  * Determines the correct route for an authenticated user based on their state
  */
 export function getRoute(): string {
-	const $organization = get(organization);
-	const $config = get(config);
+	const organization = queryClient.getQueryData<Organization | null>(
+		queryKeys.organizations.current()
+	);
+	const configData = queryClient.getQueryData<PublicServerConfig>(queryKeys.config.all);
 
-	if (!$organization) {
+	if (!organization) {
 		return resolve('/onboarding');
 	}
 
 	// Check onboarding first
-	const onboardingModalCompleted = $organization.onboarding.includes('OnboardingModalCompleted');
+	const onboardingModalCompleted = organization.onboarding.includes('OnboardingModalCompleted');
 	if (!onboardingModalCompleted) {
 		return resolve('/onboarding');
 	}
 
 	// Check billing if enabled
-	const billingEnabled = $config.billing_enabled ?? false;
-	if (billingEnabled && !isBillingPlanActive($organization)) {
+	const billingEnabled = configData?.billing_enabled ?? false;
+	if (billingEnabled && !isBillingPlanActive(organization)) {
 		return resolve('/billing');
 	}
 

@@ -1,48 +1,66 @@
 <script lang="ts">
-	import EditModal from '$lib/shared/components/forms/EditModal.svelte';
+	import { createForm } from '@tanstack/svelte-form';
+	import { submitForm } from '$lib/shared/components/forms/form-context';
+	import { required, max } from '$lib/shared/components/forms/validators';
+	import GenericModal from '$lib/shared/components/layout/GenericModal.svelte';
 	import ModalHeaderIcon from '$lib/shared/components/layout/ModalHeaderIcon.svelte';
 	import { entities } from '$lib/shared/stores/metadata';
 	import EntityMetadataSection from '$lib/shared/components/forms/EntityMetadataSection.svelte';
-	import type { CreateNetworkRequest, Network } from '../types';
-	import { createEmptyNetworkFormData } from '../store';
-	import NetworkDetailsForm from './NetworkDetailsForm.svelte';
+	import type { Network } from '../types';
+	import { createEmptyNetworkFormData } from '../queries';
 	import { pushError } from '$lib/shared/stores/feedback';
-	import { organization } from '$lib/features/organizations/store';
+	import { useOrganizationQuery } from '$lib/features/organizations/queries';
 	import Checkbox from '$lib/shared/components/forms/input/Checkbox.svelte';
-	import { field } from 'svelte-forms';
+	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
+	import TagPicker from '$lib/features/tags/components/TagPicker.svelte';
 
-	export let network: Network | null = null;
-	export let isOpen = false;
-	export let onCreate: (data: CreateNetworkRequest) => Promise<void> | void;
-	export let onUpdate: (id: string, data: Network) => Promise<void> | void;
-	export let onClose: () => void;
-	export let onDelete: ((id: string) => Promise<void> | void) | null = null;
+	let {
+		network = null,
+		isOpen = false,
+		onCreate,
+		onUpdate,
+		onClose,
+		onDelete = null
+	}: {
+		network?: Network | null;
+		isOpen?: boolean;
+		onCreate: (data: Network) => Promise<void> | void;
+		onUpdate: (id: string, data: Network) => Promise<void> | void;
+		onClose: () => void;
+		onDelete?: ((id: string) => Promise<void> | void) | null;
+	} = $props();
 
-	let loading = false;
-	let deleting = false;
+	// TanStack Query for organization
+	const organizationQuery = useOrganizationQuery();
+	let organization = $derived(organizationQuery.data);
 
-	$: isEditing = network !== null;
-	$: title = isEditing ? `Edit ${network?.name}` : 'Create Network';
+	let loading = $state(false);
+	let deleting = $state(false);
 
-	let formData: Network = createEmptyNetworkFormData();
+	let isEditing = $derived(network !== null);
+	let title = $derived(isEditing ? `Edit ${network?.name}` : 'Create Network');
+	let saveLabel = $derived(isEditing ? 'Update Network' : 'Create Network');
 
-	// Initialize form data when group changes or modal opens
-	$: if (isOpen) {
-		resetForm();
+	function getDefaultValues() {
+		return network
+			? { ...network, seedData: false }
+			: { ...createEmptyNetworkFormData(), seedData: true };
 	}
 
-	function resetForm() {
-		formData = network ? { ...network } : createEmptyNetworkFormData();
-	}
+	// Create form
+	const form = createForm(() => ({
+		defaultValues: { ...createEmptyNetworkFormData(), seedData: true },
+		onSubmit: async ({ value }) => {
+			if (!organization) {
+				pushError('Could not load ID for current user');
+				onClose();
+				return;
+			}
 
-	async function handleSubmit() {
-		// Clean up the data before sending
-
-		if ($organization) {
 			const networkData: Network = {
-				...formData,
-				name: formData.name.trim(),
-				organization_id: $organization.id
+				...(value as Network),
+				name: value.name.trim(),
+				organization_id: organization.id
 			};
 
 			loading = true;
@@ -50,18 +68,22 @@
 				if (isEditing && network) {
 					await onUpdate(network.id, networkData);
 				} else {
-					await onCreate({
-						network: networkData,
-						seed_baseline_data: $seedDataField.value
-					});
+					await onCreate(networkData);
 				}
 			} finally {
 				loading = false;
 			}
-		} else {
-			pushError('Could not load ID for current user');
-			onClose();
 		}
+	}));
+
+	// Reset form when modal opens
+	function handleOpen() {
+		const defaults = getDefaultValues();
+		form.reset(defaults);
+	}
+
+	async function handleSubmit() {
+		await submitForm(form);
 	}
 
 	async function handleDelete() {
@@ -75,52 +97,103 @@
 		}
 	}
 
-	// Dynamic labels based on create/edit mode
-	$: saveLabel = isEditing ? 'Update Network' : 'Create Network';
-
-	const seedDataField = field('seedData', true, []);
-
 	let colorHelper = entities.getColorHelper('Network');
 </script>
 
-<EditModal
-	{isOpen}
-	{title}
-	{loading}
-	{deleting}
-	{saveLabel}
-	cancelLabel="Cancel"
-	onSave={handleSubmit}
-	onCancel={onClose}
-	onDelete={isEditing ? handleDelete : null}
-	size="xl"
-	let:formApi
->
-	<!-- Header icon -->
+<GenericModal {isOpen} {title} size="xl" {onClose} onOpen={handleOpen} showCloseButton={true}>
 	<svelte:fragment slot="header-icon">
-		<ModalHeaderIcon Icon={entities.getIconComponent('Network')} color={colorHelper.string} />
+		<ModalHeaderIcon Icon={entities.getIconComponent('Network')} color={colorHelper.color} />
 	</svelte:fragment>
 
-	<!-- Content -->
-	<div class="flex h-full flex-col overflow-hidden">
-		<div class="flex-1 overflow-y-auto">
-			<div class="space-y-8 p-6">
-				<NetworkDetailsForm {formApi} bind:formData />
+	<form
+		onsubmit={(e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			handleSubmit();
+		}}
+		class="flex min-h-0 flex-1 flex-col"
+	>
+		<div class="flex-1 overflow-auto p-6">
+			<div class="space-y-8">
+				<!-- Network Details Section -->
+				<div class="space-y-4">
+					<h3 class="text-primary text-lg font-medium">Network Details</h3>
+
+					<form.Field
+						name="name"
+						validators={{
+							onBlur: ({ value }) => required(value) || max(100)(value)
+						}}
+					>
+						{#snippet children(field)}
+							<TextInput
+								label="Network Name"
+								id="name"
+								{field}
+								placeholder="e.g Home Network"
+								required
+							/>
+						{/snippet}
+					</form.Field>
+
+					<form.Field name="tags">
+						{#snippet children(field)}
+							<TagPicker
+								selectedTagIds={field.state.value || []}
+								onChange={(tags) => field.handleChange(tags)}
+							/>
+						{/snippet}
+					</form.Field>
+				</div>
 
 				{#if !isEditing}
-					<Checkbox
-						label="Track services Scanopy can't discover automatically?"
-						helpText="Creates subnets for remote hosts and internet services that aren't on your local network (Cloud services, APIs, SaaS tools, etc). Includes example data to show how it works."
-						id="seedData"
-						field={seedDataField}
-						{formApi}
-					/>
+					<form.Field name="seedData">
+						{#snippet children(field)}
+							<Checkbox
+								label="Track services Scanopy can't discover automatically?"
+								helpText="Creates subnets for remote hosts and internet services that aren't on your local network (Cloud services, APIs, SaaS tools, etc). Includes example data to show how it works."
+								id="seedData"
+								{field}
+							/>
+						{/snippet}
+					</form.Field>
 				{/if}
 
-				{#if isEditing}
+				{#if isEditing && network}
 					<EntityMetadataSection entities={[network]} />
 				{/if}
 			</div>
 		</div>
-	</div>
-</EditModal>
+
+		<!-- Footer -->
+		<div class="modal-footer">
+			<div class="flex items-center justify-between">
+				<div>
+					{#if isEditing && onDelete}
+						<button
+							type="button"
+							disabled={deleting || loading}
+							onclick={handleDelete}
+							class="btn-danger"
+						>
+							{deleting ? 'Deleting...' : 'Delete'}
+						</button>
+					{/if}
+				</div>
+				<div class="flex items-center gap-3">
+					<button
+						type="button"
+						disabled={loading || deleting}
+						onclick={onClose}
+						class="btn-secondary"
+					>
+						Cancel
+					</button>
+					<button type="submit" disabled={loading || deleting} class="btn-primary">
+						{loading ? 'Saving...' : saveLabel}
+					</button>
+				</div>
+			</div>
+		</div>
+	</form>
+</GenericModal>

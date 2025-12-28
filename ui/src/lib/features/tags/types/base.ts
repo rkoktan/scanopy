@@ -1,20 +1,13 @@
+import type { components } from '$lib/api/schema';
 import { utcTimeZoneSentinel, uuidv4Sentinel } from '$lib/shared/utils/formatting';
 
-export interface Tag {
-	name: string;
-	description: string | null;
-	color: string;
-	id: string;
-	created_at: string;
-	updated_at: string;
-	organization_id: string;
-}
+export type Tag = components['schemas']['Tag'];
 
 export function createDefaultTag(organization_id: string): Tag {
 	return {
-		name: 'New Tag',
+		name: '',
 		description: null,
-		color: 'yellow',
+		color: 'Yellow',
 		id: uuidv4Sentinel,
 		created_at: utcTimeZoneSentinel,
 		updated_at: utcTimeZoneSentinel,

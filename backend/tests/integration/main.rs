@@ -15,11 +15,13 @@ mod discovery;
 #[cfg(feature = "generate-fixtures")]
 mod fixtures;
 mod infra;
+mod openapi_gen;
+mod permissions;
 mod validations;
 
 use infra::{
-    ContainerManager, TestClient, TestContext, setup_authenticated_user, wait_for_daemon,
-    wait_for_network, wait_for_organization,
+    ContainerManager, TestClient, TestContext, create_test_db_pool, setup_authenticated_user,
+    wait_for_daemon, wait_for_network, wait_for_organization,
 };
 
 /// Single integration test that runs all test categories with shared containers.
@@ -93,10 +95,15 @@ async fn integration_tests() {
     println!("Phase 2: CRUD Endpoint Tests");
     println!("============================================================");
 
+    let db_pool = create_test_db_pool()
+        .await
+        .expect("Failed to create test database pool");
+
     let ctx = TestContext {
         client: TestClient::new(),
         network_id: network.id,
         organization_id: organization.id,
+        db_pool,
     };
 
     // Re-authenticate for CRUD tests
@@ -129,12 +136,23 @@ async fn integration_tests() {
         .expect("Validation tests failed");
 
     // =========================================================================
-    // Phase 5: Generate Fixtures (optional)
+    // Phase 5: Permission & Access Control Tests
+    // =========================================================================
+    println!("\n============================================================");
+    println!("Phase 5: Permission & Access Control Tests");
+    println!("============================================================");
+
+    permissions::run_permission_tests(&ctx)
+        .await
+        .expect("Permission tests failed");
+
+    // =========================================================================
+    // Phase 6: Generate Fixtures (optional)
     // =========================================================================
     #[cfg(feature = "generate-fixtures")]
     {
         println!("\n============================================================");
-        println!("Phase 5: Generating Fixtures");
+        println!("Phase 6: Generating Fixtures");
         println!("============================================================");
 
         fixtures::generate_fixtures().await;
@@ -150,6 +168,7 @@ async fn integration_tests() {
     println!("   - CRUD endpoint tests");
     println!("   - Billing middleware tests");
     println!("   - Handler validation tests");
+    println!("   - Permission & access control tests");
     #[cfg(feature = "generate-fixtures")]
     println!("   - Fixture generation");
 }

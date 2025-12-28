@@ -1,37 +1,65 @@
-import type { Service } from '$lib/features/services/types/base';
-import type { EntitySource } from '$lib/shared/types';
+// Re-export generated types from OpenAPI schema
+import type { components } from '$lib/api/schema';
 
-export interface HostWithServicesRequest {
-	host: Host;
-	services: Service[] | null;
-}
+// Entity primitive types
+export type Host = components['schemas']['Host'];
+export type HostVirtualization = components['schemas']['HostVirtualization'];
+export type ProxmoxVirtualization = components['schemas']['ProxmoxVirtualization'];
+export type Interface = components['schemas']['Interface'];
+export type Port = components['schemas']['Port'];
+export type Service = components['schemas']['Service'];
+export type TransportProtocol = components['schemas']['TransportProtocol'];
 
-export type HostVirtualization = { type: 'Proxmox'; details: ProxmoxVirtualization };
+// API response type (host with hydrated children)
+export type HostResponse = components['schemas']['HostResponse'];
 
-export interface Host {
+// API request types
+export type CreateHostRequest = components['schemas']['CreateHostRequest'];
+export type CreateInterfaceInput = components['schemas']['CreateInterfaceInput'];
+export type CreatePortInput = components['schemas']['CreatePortInput'];
+export type UpdateHostRequest = components['schemas']['UpdateHostRequest'];
+export type UpdateInterfaceInput = components['schemas']['UpdateInterfaceInput'];
+export type UpdatePortInput = components['schemas']['UpdatePortInput'];
+
+// Form state type for creating/editing hosts
+// Includes children arrays for form editing - distinct from HostResponse (API response type)
+export interface HostFormData {
+	// Host primitive fields
 	id: string;
 	created_at: string;
 	updated_at: string;
 	name: string;
-	description: string;
-	hostname: string;
-	target: HostTarget;
-	services: string[];
-	ports: Port[];
-	interfaces: Interface[];
-	virtualization: HostVirtualization | null;
-	source: EntitySource;
 	network_id: string;
+	hostname: string | null;
+	description: string | null;
+	source: components['schemas']['EntitySource'];
+	virtualization: HostVirtualization | null;
 	hidden: boolean;
 	tags: string[];
+	// Children for form editing (managed separately from host in stores)
+	interfaces: Interface[];
+	ports: Port[];
+	services: Service[];
 }
 
-export interface ProxmoxVirtualization {
-	vm_id: string | null;
-	vm_name: string | null;
-	service_id: string;
+// Request type for creating a host (needs form data with children)
+export interface CreateHostWithServicesRequest {
+	host: HostFormData;
+	services: Service[] | null;
 }
 
+// Request type for updating a host with children
+export interface UpdateHostWithServicesRequest {
+	host: Host;
+	/** Interfaces to sync - if provided, will create/update/delete to match */
+	interfaces: Interface[] | null;
+	/** Ports to sync - if provided, will create/update/delete to match */
+	ports: Port[] | null;
+	/** Services to sync - if provided, will create/update/delete to match */
+	services: Service[] | null;
+}
+
+// Frontend-specific types
 export interface AllInterfaces {
 	id: null;
 	name: string;
@@ -41,31 +69,3 @@ export const ALL_INTERFACES: AllInterfaces = {
 	id: null,
 	name: 'All Interfaces'
 };
-
-export interface Interface {
-	id: string;
-	subnet_id: string;
-	name: string;
-	ip_address?: string;
-	mac_address?: string;
-}
-
-export type HostTarget =
-	// Binding ID
-	{ type: 'ServiceBinding'; config: string } | { type: 'None' } | { type: 'Hostname' };
-
-// For backwards compatibility during transition
-export interface IpTargetConfig {
-	ip: string;
-}
-
-export interface HostnameTargetConfig {
-	hostname: string;
-}
-
-export interface Port {
-	number: number;
-	protocol: 'Tcp' | 'Udp';
-	id: string;
-	type: string;
-}

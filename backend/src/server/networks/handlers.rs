@@ -1,75 +1,137 @@
-use crate::server::auth::middleware::{
-    auth::AuthenticatedUser,
-    features::{CreateNetworkFeature, RequireFeature},
-    permissions::RequireAdmin,
-};
-use crate::server::networks::api::CreateNetworkRequest;
+use crate::server::auth::middleware::permissions::RequireMember;
 use crate::server::shared::handlers::traits::{
-    CrudHandlers, bulk_delete_handler, delete_handler, get_by_id_handler, update_handler,
+    BulkDeleteResponse, CrudHandlers, bulk_delete_handler, create_handler, delete_handler,
+    update_handler,
 };
-use crate::server::shared::types::api::ApiError;
+use crate::server::{
+    auth::middleware::{
+        features::{CreateNetworkFeature, RequireFeature},
+        permissions::RequireAdmin,
+    },
+    shared::types::api::{ApiErrorResponse, EmptyApiResponse},
+};
 use crate::server::{
     config::AppState,
     networks::r#impl::Network,
-    shared::{
-        services::traits::CrudService,
-        storage::filter::EntityFilter,
-        types::api::{ApiResponse, ApiResult},
-    },
+    shared::types::api::{ApiResponse, ApiResult},
 };
-use axum::{
-    Router,
-    extract::State,
-    response::Json,
-    routing::{delete, get, post, put},
-};
+use axum::extract::{Path, State};
+use axum::response::Json;
 use std::sync::Arc;
+use utoipa_axum::{router::OpenApiRouter, routes};
+use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", post(create_handler))
-        .route("/", get(get_all_networks))
-        .route("/{id}", put(update_handler::<Network>))
-        .route("/{id}", delete(delete_handler::<Network>))
-        .route("/{id}", get(get_by_id_handler::<Network>))
-        .route("/bulk-delete", post(bulk_delete_handler::<Network>))
+// Generated handlers for operations that use generic CRUD logic
+mod generated {
+    use super::*;
+    crate::crud_get_all_handler!(Network, "networks", "network");
+    crate::crud_get_by_id_handler!(Network, "networks", "network");
 }
 
-pub async fn create_handler(
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(generated::get_all, create_network))
+        .routes(routes!(
+            generated::get_by_id,
+            update_network,
+            delete_network
+        ))
+        .routes(routes!(bulk_delete_networks))
+}
+
+/// Create a new network
+#[utoipa::path(
+    post,
+    path = "",
+    tag = "networks",
+    responses(
+        (status = 200, description = "Network created", body = ApiResponse<Network>),
+    ),
+    security(("session" = []))
+)]
+async fn create_network(
     State(state): State<Arc<AppState>>,
     RequireAdmin(user): RequireAdmin,
     RequireFeature { .. }: RequireFeature<CreateNetworkFeature>,
-    Json(request): Json<CreateNetworkRequest>,
+    Json(network): Json<Network>,
 ) -> ApiResult<Json<ApiResponse<Network>>> {
-    if let Err(err) = request.network.validate() {
-        return Err(ApiError::bad_request(&format!(
-            "Network validation failed: {}",
-            err
-        )));
+    let response = create_handler::<Network>(
+        State(state.clone()),
+        RequireMember(user.clone()),
+        Json(network),
+    )
+    .await?;
+
+    if let Some(network) = &response.data {
+        let service = Network::get_service(&state);
+        service
+            .create_organizational_subnets(network.id, user.into())
+            .await?;
     }
 
-    let service = Network::get_service(&state);
-    let created = service
-        .create(request.network, user.clone().into())
-        .await
-        .map_err(|e| ApiError::internal_error(&e.to_string()))?;
-
-    if request.seed_baseline_data {
-        service.seed_default_data(created.id, user.into()).await?;
-    }
-
-    Ok(Json(ApiResponse::success(created)))
+    Ok(response)
 }
 
-async fn get_all_networks(
-    State(state): State<Arc<AppState>>,
-    user: AuthenticatedUser,
-) -> ApiResult<Json<ApiResponse<Vec<Network>>>> {
-    let service = &state.services.network_service;
+/// Update a network
+#[utoipa::path(
+    put,
+    path = "/{id}",
+    tag = "networks",
+    params(("id" = Uuid, Path, description = "Network ID")),
+    request_body = Network,
+    responses(
+        (status = 200, description = "Network updated", body = ApiResponse<Network>),
+        (status = 404, description = "Network not found", body = ApiErrorResponse),
+        (status = 403, description = "User not admin", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+async fn update_network(
+    state: State<Arc<AppState>>,
+    user: RequireAdmin,
+    path: Path<Uuid>,
+    json: Json<Network>,
+) -> ApiResult<Json<ApiResponse<Network>>> {
+    update_handler::<Network>(state, user.into(), path, json).await
+}
 
-    let filter = EntityFilter::unfiltered().entity_ids(&user.network_ids);
+/// Delete a network
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    tag = "networks",
+    params(("id" = Uuid, Path, description = "Network ID")),
+    responses(
+        (status = 200, description = "Network deleted", body = EmptyApiResponse),
+        (status = 404, description = "Network not found", body = ApiErrorResponse),
+        (status = 403, description = "User not admin", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+async fn delete_network(
+    state: State<Arc<AppState>>,
+    user: RequireAdmin,
+    path: Path<Uuid>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    delete_handler::<Network>(state, user.into(), path).await
+}
 
-    let networks = service.get_all(filter).await?;
-
-    Ok(Json(ApiResponse::success(networks)))
+/// Bulk delete networks
+#[utoipa::path(
+    post,
+    path = "/bulk-delete",
+    tag = "networks",
+    request_body(content = Vec<Uuid>, description = "Array of network IDs to delete"),
+    responses(
+        (status = 200, description = "Networks deleted successfully", body = ApiResponse<BulkDeleteResponse>),
+        (status = 403, description = "User not admin", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+async fn bulk_delete_networks(
+    state: State<Arc<AppState>>,
+    user: RequireAdmin,
+    json: Json<Vec<Uuid>>,
+) -> ApiResult<Json<ApiResponse<BulkDeleteResponse>>> {
+    bulk_delete_handler::<Network>(state, user.into(), json).await
 }

@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use crate::server::bindings::r#impl::base::Binding;
 use crate::server::groups::r#impl::base::Group;
 use crate::server::services::r#impl::base::Service;
 use crate::server::shared::events::types::TelemetryOperation;
@@ -8,16 +9,11 @@ use crate::server::{
     billing::types::base::BillingPlan,
     daemons::r#impl::{api::DaemonCapabilities, base::DaemonMode},
     discovery::r#impl::types::{DiscoveryType, RunType},
-    groups::r#impl::types::GroupType,
-    hosts::r#impl::{
-        base::Host, interfaces::Interface, ports::Port, targets::HostTarget,
-        virtualization::HostVirtualization,
-    },
-    services::r#impl::{
-        bindings::Binding, definitions::ServiceDefinition, virtualization::ServiceVirtualization,
-    },
+    hosts::r#impl::{base::Host, virtualization::HostVirtualization},
+    interfaces::r#impl::base::Interface,
+    ports::r#impl::base::Port,
+    services::r#impl::{definitions::ServiceDefinition, virtualization::ServiceVirtualization},
     shared::{storage::filter::EntityFilter, types::entities::EntitySource},
-    subnets::r#impl::types::SubnetType,
     topology::types::{
         base::TopologyOptions,
         edges::{Edge, EdgeStyle},
@@ -29,6 +25,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use cidr::IpCidr;
 use email_address::EmailAddress;
+use mac_address::MacAddress;
 use sqlx::postgres::PgRow;
 use stripe_billing::SubscriptionStatus;
 use uuid::Uuid;
@@ -38,6 +35,11 @@ pub trait Storage<T: StorableEntity>: Send + Sync {
     async fn create(&self, entity: &T) -> Result<T, anyhow::Error>;
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<T>, anyhow::Error>;
     async fn get_all(&self, filter: EntityFilter) -> Result<Vec<T>, anyhow::Error>;
+    async fn get_all_ordered(
+        &self,
+        filter: EntityFilter,
+        order_by: &str,
+    ) -> Result<Vec<T>, anyhow::Error>;
     async fn get_one(&self, filter: EntityFilter) -> Result<Option<T>, anyhow::Error>;
     async fn update(&self, entity: &mut T) -> Result<T, anyhow::Error>;
     async fn delete(&self, id: &Uuid) -> Result<(), anyhow::Error>;
@@ -45,7 +47,7 @@ pub trait Storage<T: StorableEntity>: Send + Sync {
     async fn delete_by_filter(&self, filter: EntityFilter) -> Result<usize, anyhow::Error>;
 }
 
-pub trait StorableEntity: Sized + Clone + Send + Sync + 'static {
+pub trait StorableEntity: Sized + Clone + Send + Sync + 'static + Default {
     type BaseData;
 
     fn new(base: Self::BaseData) -> Self;
@@ -59,8 +61,16 @@ pub trait StorableEntity: Sized + Clone + Send + Sync + 'static {
     fn id(&self) -> Uuid;
     fn network_id(&self) -> Option<Uuid>;
     fn organization_id(&self) -> Option<Uuid>;
+    fn is_network_keyed() -> bool {
+        Self::default().network_id().is_some()
+    }
+    fn is_organization_keyed() -> bool {
+        Self::default().organization_id().is_some()
+    }
     fn created_at(&self) -> DateTime<Utc>;
     fn updated_at(&self) -> DateTime<Utc>;
+    fn set_id(&mut self, id: Uuid);
+    fn set_created_at(&mut self, time: DateTime<Utc>);
     fn set_updated_at(&mut self, time: DateTime<Utc>);
 
     /// Serialization for database storage
@@ -88,15 +98,11 @@ pub enum SqlValue {
     IpCidr(IpCidr),
     IpAddr(IpAddr),
     EntitySource(EntitySource),
-    SubnetType(SubnetType),
-    GroupType(GroupType),
-    Bindings(Vec<Binding>),
     ServiceDefinition(Box<dyn ServiceDefinition>),
     OptionalServiceVirtualization(Option<ServiceVirtualization>),
     OptionalHostVirtualization(Option<HostVirtualization>),
     Ports(Vec<Port>),
     Interfaces(Vec<Interface>),
-    HostTarget(HostTarget),
     RunType(RunType),
     DiscoveryType(DiscoveryType),
     DaemonCapabilities(DaemonCapabilities),
@@ -111,9 +117,11 @@ pub enum SqlValue {
     Hosts(Vec<Host>),
     Subnets(Vec<Subnet>),
     Services(Vec<Service>),
+    Bindings(Vec<Binding>),
     Groups(Vec<Group>),
     TelemetryOperation(Vec<TelemetryOperation>),
     StringArray(Vec<String>),
     OptionalStringArray(Option<Vec<String>>),
     JsonValue(serde_json::Value),
+    OptionalMacAddress(Option<MacAddress>),
 }

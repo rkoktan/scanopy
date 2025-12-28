@@ -1,55 +1,82 @@
 <script lang="ts">
 	import type { Service } from '$lib/features/services/types/base';
-	import { getServicesForHost, services } from '$lib/features/services/store';
+	import { useServicesQuery } from '$lib/features/services/queries';
 	import { ServiceDisplay } from '$lib/shared/components/forms/selection/display/ServiceDisplay.svelte';
 	import ListManager from '$lib/shared/components/forms/selection/ListManager.svelte';
 	import { serviceDefinitions } from '$lib/shared/stores/metadata';
-	import { get } from 'svelte/store';
-	import type { FormApi } from '$lib/shared/components/forms/types';
 
-	export let service: Service;
-	export let onChange: (updatedService: Service) => void;
-	export let formApi: FormApi;
+	interface Props {
+		service: Service;
+		onChange: (updatedService: Service) => void;
+	}
 
-	$: serviceMetadata = serviceDefinitions.getItem(service.service_definition);
+	let { service, onChange }: Props = $props();
 
-	$: managedContainers = $services.filter(
-		(s) =>
-			s.virtualization &&
-			s.virtualization?.type == 'Docker' &&
-			s.virtualization.details.service_id == service.id
-	);
-	$: containerIds = managedContainers.map((s) => s.id);
+	// TanStack Query hooks
+	const servicesQuery = useServicesQuery();
+	let servicesData = $derived(servicesQuery.data ?? []);
+
+	let serviceMetadata = $derived(serviceDefinitions.getItem(service.service_definition));
+
+	// Use local state for managed containers to support immediate UI updates
+	let managedContainers = $state<Service[]>([]);
+	let initialized = $state(false);
+
+	// Initialize managedContainers when servicesData is available (only once at mount)
+	$effect(() => {
+		if (servicesData.length > 0 && !initialized) {
+			initialized = true;
+			managedContainers = servicesData.filter(
+				(s) =>
+					s.virtualization &&
+					s.virtualization?.type == 'Docker' &&
+					s.virtualization.details.service_id == service.id
+			);
+		}
+	});
+
+	let containerIds = $derived(managedContainers.map((s) => s.id));
 
 	// Filter out services on other hosts and already managed containers
-	$: selectableContainers = $services.filter(
-		(s) => s.host_id === service.host_id && s.id !== service.id && !containerIds.includes(s.id)
+	let selectableContainers = $derived(
+		servicesData.filter(
+			(s) => s.host_id === service.host_id && s.id !== service.id && !containerIds.includes(s.id)
+		)
 	);
 
 	function handleAddContainer(serviceId: string) {
-		let services = getServicesForHost(service.host_id);
-		let containerizedService = get(services).find((s) => s.id == serviceId);
+		const servicesForHost = servicesData.filter((s) => s.host_id === service.host_id);
+		const containerizedService = servicesForHost.find((s) => s.id == serviceId);
 
 		if (containerizedService) {
-			containerizedService.virtualization = {
-				type: 'Docker',
-				details: {
-					container_id: null,
-					container_name: null,
-					service_id: service.id
+			const updatedService = {
+				...containerizedService,
+				virtualization: {
+					type: 'Docker' as const,
+					details: {
+						container_id: null,
+						container_name: null,
+						service_id: service.id
+					}
 				}
 			};
 
-			onChange(containerizedService);
+			managedContainers = [...managedContainers, updatedService];
+			onChange(updatedService);
 		}
 	}
 
 	function handleRemoveContainer(index: number) {
-		let removedContainer = managedContainers.at(index);
+		const removedContainer = managedContainers.at(index);
 
 		if (removedContainer) {
-			removedContainer.virtualization = null;
-			onChange(removedContainer);
+			const updatedService = {
+				...removedContainer,
+				virtualization: null
+			};
+
+			managedContainers = managedContainers.filter((s) => s.id !== removedContainer.id);
+			onChange(updatedService);
 		}
 	}
 </script>
@@ -64,7 +91,6 @@
 		emptyMessage="No containers managed by this service yet. Add services that run in containers on this host."
 		allowReorder={false}
 		allowDuplicates={false}
-		{formApi}
 		allowItemEdit={() => false}
 		showSearch={true}
 		options={selectableContainers}

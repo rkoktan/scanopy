@@ -14,16 +14,18 @@ use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::postgres::PgRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, PartialEq, Eq, Hash, ToSchema)]
 pub struct UserBase {
+    #[schema(value_type = String)]
     pub email: EmailAddress,
     pub organization_id: Uuid,
     pub permissions: UserOrgPermissions,
     /// Password hash - None for legacy users created before auth migration or users using OIDC
-    #[serde(skip_serializing)] // Never send password hash to client
+    #[serde(skip)] // Never send to client, never accept from client
     pub password_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oidc_provider: Option<String>,
@@ -32,7 +34,10 @@ pub struct UserBase {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oidc_linked_at: Option<DateTime<Utc>>,
     #[serde(default)]
+    #[schema(required)]
     pub network_ids: Vec<Uuid>,
+    #[serde(default)]
+    #[schema(read_only)]
     pub terms_accepted_at: Option<DateTime<Utc>>,
 }
 
@@ -97,12 +102,21 @@ impl UserBase {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default, ToSchema, Validate,
+)]
 pub struct User {
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub id: Uuid,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub updated_at: DateTime<Utc>,
     #[serde(flatten)]
+    #[validate(nested)]
     pub base: UserBase,
 }
 
@@ -167,6 +181,14 @@ impl StorableEntity for User {
         self.updated_at
     }
 
+    fn set_id(&mut self, id: Uuid) {
+        self.id = id;
+    }
+
+    fn set_created_at(&mut self, time: DateTime<Utc>) {
+        self.created_at = time;
+    }
+
     fn set_updated_at(&mut self, time: DateTime<Utc>) {
         self.updated_at = time;
     }
@@ -185,11 +207,12 @@ impl StorableEntity for User {
                     organization_id,
                     oidc_provider,
                     oidc_subject,
-                    network_ids,
                     terms_accepted_at,
+                    ..
                 },
         } = self.clone();
 
+        // Note: network_ids is stored in user_network_access junction table, not here
         Ok((
             vec![
                 "id",
@@ -202,7 +225,6 @@ impl StorableEntity for User {
                 "oidc_subject",
                 "permissions",
                 "organization_id",
-                "network_ids",
                 "terms_accepted_at",
             ],
             vec![
@@ -216,7 +238,6 @@ impl StorableEntity for User {
                 SqlValue::OptionalString(oidc_subject),
                 SqlValue::UserOrgPermissions(permissions),
                 SqlValue::Uuid(organization_id),
-                SqlValue::UuidArray(network_ids),
                 SqlValue::OptionTimestamp(terms_accepted_at),
             ],
         ))
@@ -231,6 +252,7 @@ impl StorableEntity for User {
             .parse()
             .or(Err(Error::msg("Failed to parse permissions")))?;
 
+        // Note: network_ids is populated separately from user_network_access junction table
         Ok(User {
             id: row.get("id"),
             created_at: row.get("created_at"),
@@ -243,7 +265,7 @@ impl StorableEntity for User {
                 oidc_linked_at: row.get("oidc_linked_at"),
                 oidc_provider: row.get("oidc_provider"),
                 oidc_subject: row.get("oidc_subject"),
-                network_ids: row.get("network_ids"),
+                network_ids: vec![],
                 terms_accepted_at: row.get("terms_accepted_at"),
             },
         })

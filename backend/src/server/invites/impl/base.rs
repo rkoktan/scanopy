@@ -7,7 +7,9 @@ use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use sqlx::postgres::PgRow;
+use utoipa::ToSchema;
 use uuid::Uuid;
+use validator::Validate;
 
 use crate::server::{
     shared::{
@@ -17,7 +19,9 @@ use crate::server::{
     users::r#impl::permissions::UserOrgPermissions,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default, ToSchema, Validate,
+)]
 pub struct InviteBase {
     pub organization_id: Uuid,
     pub permissions: UserOrgPermissions,
@@ -25,15 +29,26 @@ pub struct InviteBase {
     pub url: String,
     pub created_by: Uuid,
     pub expires_at: DateTime<Utc>,
+    #[schema(value_type = Option<String>, required)]
+    /// Optional email address to send the invite to
     pub send_to: Option<EmailAddress>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default, ToSchema, Validate,
+)]
 pub struct Invite {
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub id: Uuid,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    #[schema(read_only, required)]
     pub updated_at: DateTime<Utc>,
     #[serde(flatten)]
+    #[validate(nested)]
     pub base: InviteBase,
 }
 
@@ -121,6 +136,14 @@ impl StorableEntity for Invite {
 
     fn updated_at(&self) -> DateTime<Utc> {
         self.updated_at
+    }
+
+    fn set_id(&mut self, id: Uuid) {
+        self.id = id;
+    }
+
+    fn set_created_at(&mut self, time: DateTime<Utc>) {
+        self.created_at = time;
     }
 
     fn set_updated_at(&mut self, time: DateTime<Utc>) {

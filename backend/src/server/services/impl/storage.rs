@@ -6,12 +6,14 @@ use uuid::Uuid;
 use crate::server::{
     services::r#impl::{
         base::{Service, ServiceBase},
-        bindings::Binding,
         definitions::ServiceDefinition,
         virtualization::ServiceVirtualization,
     },
     shared::{
-        storage::traits::{SqlValue, StorableEntity},
+        storage::{
+            child::ChildStorableEntity,
+            traits::{SqlValue, StorableEntity},
+        },
         types::entities::EntitySource,
     },
 };
@@ -58,6 +60,14 @@ impl StorableEntity for Service {
         self.updated_at
     }
 
+    fn set_id(&mut self, id: Uuid) {
+        self.id = id;
+    }
+
+    fn set_created_at(&mut self, time: DateTime<Utc>) {
+        self.created_at = time;
+    }
+
     fn set_updated_at(&mut self, time: DateTime<Utc>) {
         self.updated_at = time;
     }
@@ -74,7 +84,7 @@ impl StorableEntity for Service {
                     host_id,
                     service_definition,
                     virtualization,
-                    bindings,
+                    bindings: _, // Bindings stored in separate table, managed by BindingStorage
                     source,
                     tags,
                 },
@@ -90,7 +100,6 @@ impl StorableEntity for Service {
                 "host_id",
                 "service_definition",
                 "virtualization",
-                "bindings",
                 "source",
                 "tags",
             ],
@@ -103,7 +112,6 @@ impl StorableEntity for Service {
                 SqlValue::Uuid(host_id),
                 SqlValue::ServiceDefinition(service_definition),
                 SqlValue::OptionalServiceVirtualization(virtualization),
-                SqlValue::Bindings(bindings),
                 SqlValue::EntitySource(source),
                 SqlValue::UuidArray(tags),
             ],
@@ -114,9 +122,6 @@ impl StorableEntity for Service {
         let service_definition: Box<dyn ServiceDefinition> =
             serde_json::from_str(&row.get::<String, _>("service_definition"))
                 .map_err(|e| anyhow::anyhow!("Failed to deserialize service_definition: {}", e))?;
-        let bindings: Vec<Binding> =
-            serde_json::from_value(row.get::<serde_json::Value, _>("bindings"))
-                .map_err(|e| anyhow::anyhow!("Failed to deserialize bindings: {}", e))?;
         let virtualization: Option<ServiceVirtualization> =
             serde_json::from_value(row.get::<serde_json::Value, _>("virtualization"))
                 .map_err(|e| anyhow::anyhow!("Failed to deserialize virtualization: {}", e))?;
@@ -134,10 +139,20 @@ impl StorableEntity for Service {
                 host_id: row.get("host_id"),
                 service_definition,
                 virtualization,
-                bindings,
+                bindings: Vec::new(), // Bindings loaded separately by ServiceService via BindingStorage
                 tags: row.get("tags"),
                 source,
             },
         })
+    }
+}
+
+impl ChildStorableEntity for Service {
+    fn parent_column() -> &'static str {
+        "host_id"
+    }
+
+    fn parent_id(&self) -> Uuid {
+        self.base.host_id
     }
 }

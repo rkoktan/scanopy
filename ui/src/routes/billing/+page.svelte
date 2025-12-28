@@ -1,19 +1,38 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import posthog from 'posthog-js';
 	import Toast from '$lib/shared/components/feedback/Toast.svelte';
 	import BillingPlanForm from '$lib/features/billing/BillingPlanForm.svelte';
 	import type { BillingPlan } from '$lib/features/billing/types';
-	import { loadData } from '$lib/shared/utils/dataLoader';
-	import { config, getConfig } from '$lib/shared/stores/config';
+	import { useConfigQuery } from '$lib/shared/stores/config-query';
 	import { getMetadata, billingPlans, features } from '$lib/shared/stores/metadata';
 	import Loading from '$lib/shared/components/feedback/Loading.svelte';
-	import { getCurrentBillingPlans, currentPlans, checkout } from '$lib/features/billing/store';
+	import { useBillingPlansQuery, useCheckoutMutation } from '$lib/features/billing/queries';
 	import { onboardingStore } from '$lib/features/auth/stores/onboarding';
-	import { currentUser } from '$lib/features/auth/store';
+	import { useCurrentUserQuery } from '$lib/features/auth/queries';
 	import { pushSuccess, pushError } from '$lib/shared/stores/feedback';
 	import PlanInquiryModal from '$lib/features/billing/PlanInquiryModal.svelte';
 
-	const loading = loadData([getCurrentBillingPlans, getConfig, getMetadata], { loadingDelay: 0 });
+	// TanStack Query for current user
+	const currentUserQuery = useCurrentUserQuery();
+	let currentUser = $derived(currentUserQuery.data);
+
+	// TanStack Query for config
+	const configQuery = useConfigQuery();
+	let configData = $derived(configQuery.data);
+
+	// TanStack Query for billing plans
+	const billingPlansQuery = useBillingPlansQuery();
+	const checkoutMutation = useCheckoutMutation();
+	let plansData = $derived(billingPlansQuery.data ?? []);
+
+	// Load metadata on mount
+	let metadataLoaded = $state(false);
+	onMount(async () => {
+		await getMetadata();
+		metadataLoaded = true;
+	});
+	let isLoading = $derived(!metadataLoaded || billingPlansQuery.isPending);
 
 	// Determine initial filter based on use case from onboarding
 	// homelab = personal, company/msp = commercial
@@ -34,9 +53,13 @@
 	);
 
 	async function handlePlanSelect(plan: BillingPlan) {
-		const checkoutUrl = await checkout(plan);
-		if (checkoutUrl) {
-			window.location.href = checkoutUrl;
+		try {
+			const checkoutUrl = await checkoutMutation.mutateAsync(plan);
+			if (checkoutUrl) {
+				window.location.href = checkoutUrl;
+			}
+		} catch {
+			// Error handled by mutation
 		}
 	}
 
@@ -50,7 +73,7 @@
 	}
 
 	async function handleInquirySubmit(email: string, message: string) {
-		const plunkKey = $config?.plunk_key;
+		const plunkKey = configData?.plunk_key;
 		if (!plunkKey) {
 			pushError('Unable to send inquiry. Please contact sales@scanopy.net directly.');
 			return;
@@ -71,7 +94,7 @@
 					subscribed: false,
 					data: {
 						user_email: email,
-						organization_id: $currentUser?.organization_id,
+						organization_id: currentUser?.organization_id,
 						plan_type: selectedPlan?.type,
 						message,
 						use_case: useCase,
@@ -88,7 +111,7 @@
 	}
 </script>
 
-{#if $loading}
+{#if isLoading}
 	<Loading />
 {:else}
 	<div class="relative min-h-dvh bg-gray-900">
@@ -105,7 +128,7 @@
 		<section class="py-10 pb-24 lg:pb-10">
 			<div class="container mx-auto px-2">
 				<BillingPlanForm
-					plans={$currentPlans}
+					plans={plansData}
 					billingPlanHelpers={billingPlans}
 					featureHelpers={features}
 					onPlanSelect={handlePlanSelect}
@@ -122,7 +145,7 @@
 		<PlanInquiryModal
 			isOpen={inquiryModalOpen}
 			planName={selectedPlan ? billingPlans.getName(selectedPlan.type) : ''}
-			userEmail={$currentUser?.email ?? ''}
+			userEmail={currentUser?.email ?? ''}
 			onClose={() => (inquiryModalOpen = false)}
 			onSubmit={handleInquirySubmit}
 		/>

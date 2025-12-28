@@ -11,14 +11,16 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Daemon registration request from daemon to server
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
+/// Daemon capabilities
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, Hash, ToSchema)]
 pub struct DaemonCapabilities {
     #[serde(default)]
     pub has_docker_socket: bool,
     #[serde(default)]
+    #[schema(required)]
     pub interfaced_subnet_ids: Vec<Uuid>,
 }
 
@@ -33,7 +35,7 @@ impl Display for DaemonCapabilities {
 }
 
 /// Daemon registration request from daemon to server
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DaemonRegistrationRequest {
     pub daemon_id: Uuid,
     pub network_id: Uuid,
@@ -44,7 +46,7 @@ pub struct DaemonRegistrationRequest {
 }
 
 /// Daemon registration response from server to daemon
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DaemonRegistrationResponse {
     pub daemon: Daemon,
     pub host_id: Uuid,
@@ -73,7 +75,7 @@ pub struct DaemonDiscoveryResponse {
 }
 
 /// Progress update from daemon to server during discovery
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
 pub struct DiscoveryUpdatePayload {
     pub session_id: Uuid,
     pub daemon_id: Uuid,
@@ -125,7 +127,7 @@ impl DiscoveryUpdatePayload {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DaemonHeartbeatPayload {
     pub url: String,
     pub name: String,

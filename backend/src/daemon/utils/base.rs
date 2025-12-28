@@ -1,5 +1,5 @@
 use crate::server::discovery::r#impl::types::DiscoveryType;
-use crate::server::hosts::r#impl::interfaces::{Interface, InterfaceBase};
+use crate::server::interfaces::r#impl::base::{Interface, InterfaceBase};
 use crate::server::shared::storage::traits::StorableEntity;
 use crate::server::shared::types::entities::{DiscoveryMetadata, EntitySource};
 use crate::server::subnets::r#impl::base::{Subnet, SubnetBase};
@@ -106,10 +106,13 @@ pub trait DaemonUtils {
                 cidr_to_mac.insert(subnet.base.cidr, mac_address);
 
                 interfaces.push(Interface::new(InterfaceBase {
+                    network_id: subnet.base.network_id,
+                    host_id: Uuid::nil(), // Placeholder - server will set correct host_id
                     name: Some(interface_name),
                     subnet_id: subnet.id,
                     ip_address: ip_addr,
                     mac_address,
+                    position: interfaces.len() as i32,
                 }));
             }
         }
@@ -169,6 +172,20 @@ pub trait DaemonUtils {
             .await?
             .into_iter()
             .filter_map(|n| {
+                let driver = n.driver.as_deref().unwrap_or("bridge");
+
+                // Only include actual Docker bridge networks
+                // Skip: host (no separate CIDR), macvlan/ipvlan (attached to physical network),
+                // none (no networking), null (invalid)
+                if driver != "bridge" && driver != "overlay" {
+                    tracing::trace!(
+                        network_name = ?n.name,
+                        driver = driver,
+                        "Skipping non-bridge Docker network"
+                    );
+                    return None;
+                }
+
                 let network_name = n.name.clone().unwrap_or("Unknown Network".to_string());
                 n.ipam.clone().map(|ipam| (network_name, ipam))
             })

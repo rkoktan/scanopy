@@ -1,9 +1,13 @@
-use crate::server::shared::storage::{
-    filter::EntityFilter,
-    traits::{SqlValue, StorableEntity, Storage},
+use crate::server::shared::{
+    storage::{
+        filter::EntityFilter,
+        traits::{SqlValue, StorableEntity, Storage},
+    },
+    types::api::ValidationError,
 };
 use async_trait::async_trait;
 use chrono::Utc;
+use ipnetwork::IpNetwork;
 use sqlx::{PgPool, Postgres, postgres::PgArguments};
 use std::{fmt::Display, marker::PhantomData};
 use uuid::Uuid;
@@ -52,6 +56,46 @@ where
         )
     }
 
+    /// Convert a unique constraint violation into a user-friendly message
+    fn friendly_unique_violation_message(constraint: Option<&str>) -> String {
+        match constraint {
+            // ports(host_id, port_number, protocol)
+            Some(c) if c.contains("ports") => {
+                "A port with this number and protocol already exists on this host".to_string()
+            }
+            // interfaces(host_id, subnet_id, ip_address)
+            Some(c) if c.contains("interfaces") => {
+                "An interface with this IP address already exists on this host".to_string()
+            }
+            // tags(organization_id, name)
+            Some(c) if c.contains("tags") => "A tag with this name already exists".to_string(),
+            // group_bindings(group_id, binding_id)
+            Some(c) if c.contains("group_bindings") => {
+                "This binding already exists in the group".to_string()
+            }
+            // user_network_access(user_id, network_id)
+            Some(c) if c.contains("user_network_access") => {
+                "This user already has access to this network".to_string()
+            }
+            // users - email or name
+            Some(c) if c.contains("users") && c.contains("email") => {
+                "A user with this email already exists".to_string()
+            }
+            Some(c) if c.contains("users") && c.contains("name") => {
+                "A user with this name already exists".to_string()
+            }
+            Some(c) if c.contains("users") && c.contains("oidc") => {
+                "This identity provider account is already linked to another user".to_string()
+            }
+            // api_keys(key)
+            Some(c) if c.contains("api_keys") => "This API key already exists".to_string(),
+            Some(c) => {
+                format!("A record with these values already exists ({})", c)
+            }
+            None => "A record with these values already exists".to_string(),
+        }
+    }
+
     /// Bind SqlValue to query
     fn bind_value<'q>(
         query: sqlx::query::Query<'q, Postgres, PgArguments>,
@@ -70,17 +114,18 @@ where
             SqlValue::OptionalString(v) => query.bind(v),
             SqlValue::EntitySource(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::IpCidr(v) => query.bind(serde_json::to_string(v)?),
-            SqlValue::SubnetType(v) => query.bind(serde_json::to_value(v)?),
-            SqlValue::GroupType(v) => query.bind(serde_json::to_value(v)?),
-            SqlValue::Bindings(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::ServiceDefinition(v) => query.bind(serde_json::to_string(v)?),
             SqlValue::OptionalServiceVirtualization(v) => query.bind(serde_json::to_value(v)?),
-            SqlValue::HostTarget(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::Interfaces(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::Ports(v) => query.bind(serde_json::to_value(v)?),
+            SqlValue::Bindings(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::OptionalHostVirtualization(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::DaemonCapabilities(v) => query.bind(serde_json::to_value(v)?),
-            SqlValue::IpAddr(v) => query.bind(serde_json::to_string(v)?),
+            SqlValue::IpAddr(v) => {
+                // Convert IpAddr to IpNetwork for proper INET binding
+                let network = IpNetwork::from(*v);
+                query.bind(network)
+            }
             SqlValue::RunType(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::DiscoveryType(v) => query.bind(serde_json::to_value(v)?),
             SqlValue::Email(v) => query.bind(v.as_str()),
@@ -100,6 +145,10 @@ where
             SqlValue::StringArray(v) => query.bind(v.clone()),
             SqlValue::OptionalStringArray(v) => query.bind(v.clone()),
             SqlValue::JsonValue(v) => query.bind(v.clone()),
+            SqlValue::OptionalMacAddress(v) => {
+                // sqlx mac_address feature supports MacAddress directly
+                query.bind(*v)
+            }
         };
 
         Ok(value)
@@ -120,9 +169,17 @@ where
             query = Self::bind_value(query, value)?;
         }
 
-        query.execute(&self.pool).await?;
-        tracing::trace!("Created {}: {}", T::table_name(), entity);
-        Ok(entity.clone())
+        match query.execute(&self.pool).await {
+            Ok(_) => {
+                tracing::trace!("Created {}: {}", T::table_name(), entity);
+                Ok(entity.clone())
+            }
+            Err(sqlx::Error::Database(db_err)) if db_err.is_unique_violation() => {
+                let friendly_msg = Self::friendly_unique_violation_message(db_err.constraint());
+                Err(ValidationError::new(friendly_msg).into())
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<T>, anyhow::Error> {
@@ -151,10 +208,19 @@ where
     }
 
     async fn get_all(&self, filter: EntityFilter) -> Result<Vec<T>, anyhow::Error> {
+        self.get_all_ordered(filter, "created_at ASC").await
+    }
+
+    async fn get_all_ordered(
+        &self,
+        filter: EntityFilter,
+        order_by: &str,
+    ) -> Result<Vec<T>, anyhow::Error> {
         let query_str = format!(
-            "SELECT * FROM {} {} ORDER BY created_at ASC",
+            "SELECT * FROM {} {} ORDER BY {}",
             T::table_name(),
-            filter.to_where_clause()
+            filter.to_where_clause(),
+            order_by
         );
 
         let mut query = sqlx::query(&query_str);

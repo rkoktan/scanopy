@@ -1,14 +1,5 @@
-import type { EntitySource } from '$lib/shared/types';
+import type { components } from '$lib/api/schema';
 
-export interface Subnet {
-	id: string;
-	created_at: string;
-	updated_at: string;
-	cidr: string;
-	name: string;
-	description?: string;
-	network_id: string;
-	source: EntitySource;
-	subnet_type: string;
-	tags: string[];
-}
+// Re-export generated types
+export type Subnet = components['schemas']['Subnet'];
+export type SubnetType = components['schemas']['SubnetType'];

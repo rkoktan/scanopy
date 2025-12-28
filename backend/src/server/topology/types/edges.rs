@@ -3,22 +3,27 @@ use crate::server::{
     shared::{
         concepts::Concept,
         entities::EntityDiscriminants,
-        types::metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+        types::{
+            Color, Icon,
+            metadata::{EntityMetadataProvider, HasId, TypeMetadataProvider},
+        },
     },
     subnets::r#impl::base::Subnet,
     topology::types::layout::Ixy,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumDiscriminants, EnumIter, IntoStaticStr};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, ToSchema)]
 pub struct Edge {
     pub id: Uuid,
     pub source: Uuid,
     pub target: Uuid,
     #[serde(flatten)]
     pub edge_type: EdgeType,
+    #[schema(required)]
     pub label: Option<String>,
     pub source_handle: EdgeHandle,
     pub target_handle: EdgeHandle,
@@ -26,7 +31,18 @@ pub struct Edge {
 }
 
 #[derive(
-    Serialize, Copy, Deserialize, Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Default,
+    Serialize,
+    Copy,
+    Deserialize,
+    Debug,
+    Clone,
+    Eq,
+    PartialEq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Default,
+    ToSchema,
 )]
 pub enum EdgeHandle {
     #[default]
@@ -37,7 +53,18 @@ pub enum EdgeHandle {
 }
 
 #[derive(
-    Serialize, Copy, Deserialize, Debug, Clone, Eq, PartialEq, Hash, Default, IntoStaticStr, Display,
+    Serialize,
+    Copy,
+    Deserialize,
+    Debug,
+    Clone,
+    Eq,
+    PartialEq,
+    Hash,
+    Default,
+    IntoStaticStr,
+    Display,
+    ToSchema,
 )]
 pub enum EdgeStyle {
     Straight,
@@ -230,8 +257,9 @@ impl EdgeHandle {
     EnumDiscriminants,
     IntoStaticStr,
     EnumIter,
+    ToSchema,
 )]
-#[strum_discriminants(derive(Display, Hash, Serialize, Deserialize, EnumIter))]
+#[strum_discriminants(derive(Display, Hash, Serialize, Deserialize, EnumIter, ToSchema))]
 #[serde(tag = "edge_type")]
 pub enum EdgeType {
     Interface {
@@ -263,7 +291,7 @@ impl HasId for EdgeType {
 }
 
 impl EntityMetadataProvider for EdgeType {
-    fn color(&self) -> &'static str {
+    fn color(&self) -> Color {
         match self {
             EdgeType::RequestPath { .. } => EntityDiscriminants::Group.color(),
             EdgeType::HubAndSpoke { .. } => EntityDiscriminants::Group.color(),
@@ -273,7 +301,7 @@ impl EntityMetadataProvider for EdgeType {
         }
     }
 
-    fn icon(&self) -> &'static str {
+    fn icon(&self) -> Icon {
         match self {
             EdgeType::RequestPath { .. } => GroupTypeDiscriminants::RequestPath.icon(),
             EdgeType::HubAndSpoke { .. } => GroupTypeDiscriminants::HubAndSpoke.icon(),

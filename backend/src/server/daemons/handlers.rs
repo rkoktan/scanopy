@@ -1,6 +1,9 @@
 use crate::server::billing::types::base::BillingPlan;
 use crate::server::daemons::r#impl::api::DaemonHeartbeatPayload;
 use crate::server::shared::events::types::TelemetryOperation;
+use crate::server::shared::services::traits::CrudService;
+use crate::server::shared::storage::traits::StorableEntity;
+use crate::server::shared::types::api::ApiErrorResponse;
 use crate::server::{
     auth::middleware::auth::{AuthenticatedDaemon, AuthenticatedEntity},
     config::AppState,
@@ -18,40 +21,60 @@ use crate::server::{
     hosts::r#impl::base::{Host, HostBase},
     shared::{
         events::types::TelemetryEvent,
-        handlers::traits::{
-            bulk_delete_handler, delete_handler, get_all_handler, get_by_id_handler, update_handler,
+        services::traits::EventBusService,
+        types::{
+            api::{ApiError, ApiResponse, ApiResult, EmptyApiResponse},
+            entities::EntitySource,
         },
-        services::traits::{CrudService, EventBusService},
-        storage::traits::StorableEntity,
-        types::api::{ApiError, ApiResponse, ApiResult},
     },
 };
 use axum::{
-    Router,
     extract::{Path, State},
     response::Json,
-    routing::{delete, get, post, put},
 };
 use chrono::Utc;
 use std::sync::Arc;
+use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-pub fn create_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/", get(get_all_handler::<Daemon>))
-        .route("/{id}", put(update_handler::<Daemon>))
-        .route("/{id}", delete(delete_handler::<Daemon>))
-        .route("/{id}", get(get_by_id_handler::<Daemon>))
-        .route("/bulk-delete", post(bulk_delete_handler::<Daemon>))
-        .route("/register", post(register_daemon))
-        .route("/{id}/heartbeat", post(receive_heartbeat))
-        .route("/{id}/update-capabilities", post(update_capabilities))
-        .route("/{id}/request-work", post(receive_work_request))
+// Generated handlers for operations that use generic CRUD logic
+mod generated {
+    use super::*;
+    crate::crud_get_all_handler!(Daemon, "daemons", "daemon");
+    crate::crud_get_by_id_handler!(Daemon, "daemons", "daemon");
+    crate::crud_delete_handler!(Daemon, "daemons", "daemon");
+    crate::crud_bulk_delete_handler!(Daemon, "daemons");
+}
+
+pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
+        .routes(routes!(generated::get_all))
+        .routes(routes!(generated::get_by_id, generated::delete))
+        .routes(routes!(generated::bulk_delete))
+        // Daemon-only endpoints (internal API - hidden from public docs)
+        .routes(routes!(register_daemon))
+        .routes(routes!(receive_heartbeat))
+        .routes(routes!(update_capabilities))
+        .routes(routes!(receive_work_request))
 }
 
 const DAILY_MIDNIGHT_CRON: &str = "0 0 0 * * *";
 
 /// Register a new daemon
+///
+/// Internal endpoint for daemon self-registration. Creates a host entry
+/// and sets up default discovery jobs for the daemon.
+#[utoipa::path(
+    post,
+    path = "/register",
+    tags = ["daemons", "internal"],
+    request_body = DaemonRegistrationRequest,
+    responses(
+        (status = 200, description = "Daemon registered successfully", body = ApiResponse<DaemonRegistrationResponse>),
+        (status = 403, description = "Daemon registration disabled in demo mode", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
 async fn register_daemon(
     State(state): State<Arc<AppState>>,
     auth_daemon: AuthenticatedDaemon,
@@ -83,18 +106,25 @@ async fn register_daemon(
     tracing::info!("{:?}", request);
 
     // Create a dummy host to return a host_id to the daemon
-    let mut dummy_host = Host::new(HostBase::default());
-    dummy_host.base.network_id = request.network_id;
-    dummy_host.base.name = request.name.clone();
+    let dummy_host = Host::new(HostBase {
+        network_id: request.network_id,
+        name: request.name.clone(),
+        hostname: None,
+        description: None,
+        source: EntitySource::Discovery { metadata: vec![] },
+        virtualization: None,
+        hidden: false,
+        tags: Vec::new(),
+    });
 
-    let (host, _) = state
+    let host_response = state
         .services
         .host_service
-        .create_host_with_services(dummy_host, Vec::new(), auth_daemon.into())
+        .discover_host(dummy_host, vec![], vec![], vec![], auth_daemon.into())
         .await?;
 
     let mut daemon = Daemon::new(DaemonBase {
-        host_id: host.id,
+        host_id: host_response.id,
         network_id: request.network_id,
         url: request.url.clone(),
         capabilities: request.capabilities.clone(),
@@ -146,7 +176,9 @@ async fn register_daemon(
 
     let discovery_service = state.services.discovery_service.clone();
 
-    let self_report_discovery_type = DiscoveryType::SelfReport { host_id: host.id };
+    let self_report_discovery_type = DiscoveryType::SelfReport {
+        host_id: host_response.id,
+    };
 
     let self_report_discovery = discovery_service
         .create_discovery(
@@ -172,7 +204,7 @@ async fn register_daemon(
 
     if request.capabilities.has_docker_socket {
         let docker_discovery_type = DiscoveryType::Docker {
-            host_id: host.id,
+            host_id: host_response.id,
             host_naming_fallback: HostNamingFallback::BestService,
         };
 
@@ -228,10 +260,25 @@ async fn register_daemon(
 
     Ok(Json(ApiResponse::success(DaemonRegistrationResponse {
         daemon: registered_daemon,
-        host_id: host.id,
+        host_id: host_response.id,
     })))
 }
 
+/// Update daemon capabilities
+///
+/// Internal endpoint for daemons to report their current capabilities.
+#[utoipa::path(
+    post,
+    path = "/{id}/update-capabilities",
+    tags = ["daemons", "internal"],
+    params(("id" = Uuid, Path, description = "Daemon ID")),
+    request_body = DaemonCapabilities,
+    responses(
+        (status = 200, description = "Capabilities updated", body = EmptyApiResponse),
+        (status = 404, description = "Daemon not found", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
 async fn update_capabilities(
     State(state): State<Arc<AppState>>,
     auth_daemon: AuthenticatedDaemon,
@@ -258,7 +305,22 @@ async fn update_capabilities(
     Ok(Json(ApiResponse::success(())))
 }
 
-/// Receive heartbeat from daemon
+/// Receive daemon heartbeat
+///
+/// Internal endpoint for daemons to send periodic heartbeats.
+/// Updates the daemon's last_seen timestamp and current status.
+#[utoipa::path(
+    post,
+    path = "/{id}/heartbeat",
+    tags = ["daemons", "internal"],
+    params(("id" = Uuid, Path, description = "Daemon ID")),
+    request_body = DaemonHeartbeatPayload,
+    responses(
+        (status = 200, description = "Heartbeat received", body = EmptyApiResponse),
+        (status = 404, description = "Daemon not found", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
 async fn receive_heartbeat(
     State(state): State<Arc<AppState>>,
     auth_daemon: AuthenticatedDaemon,
@@ -286,6 +348,23 @@ async fn receive_heartbeat(
     Ok(Json(ApiResponse::success(())))
 }
 
+/// Request work from server
+///
+/// Internal endpoint for daemons to poll for pending discovery sessions.
+/// Also updates heartbeat and returns any pending cancellation requests.
+/// Returns tuple of (next_session, should_cancel).
+#[utoipa::path(
+    post,
+    path = "/{id}/request-work",
+    tags = ["daemons", "internal"],
+    params(("id" = Uuid, Path, description = "Daemon ID")),
+    request_body = DaemonHeartbeatPayload,
+    responses(
+        (status = 200, description = "Work request processed - returns (Option<DiscoveryUpdatePayload>, bool)"),
+        (status = 404, description = "Daemon not found", body = ApiErrorResponse),
+    ),
+    security(("api_key" = []))
+)]
 async fn receive_work_request(
     State(state): State<Arc<AppState>>,
     auth_daemon: AuthenticatedDaemon,

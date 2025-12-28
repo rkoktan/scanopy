@@ -2,15 +2,10 @@
 	import Loading from '$lib/shared/components/feedback/Loading.svelte';
 	import TopologyViewer from './visualization/TopologyViewer.svelte';
 	import TopologyOptionsPanel from './panel/TopologyOptionsPanel.svelte';
-	import { loadData } from '$lib/shared/utils/dataLoader';
 	import { Edit, Globe, Lock, Plus, Radio, RefreshCcw, Share2, Trash2 } from 'lucide-svelte';
-	import { getHosts } from '$lib/features/hosts/store';
-	import { getServices } from '$lib/features/services/store';
-	import { getSubnets } from '$lib/features/subnets/store';
 	import ExportButton from './ExportButton.svelte';
 	import ShareModal from '$lib/features/shares/components/ShareModal.svelte';
 	import { SvelteFlowProvider } from '@xyflow/svelte';
-	import { getGroups } from '$lib/features/groups/store';
 	import {
 		topologies,
 		topology,
@@ -19,11 +14,11 @@
 		rebuildTopology,
 		lockTopology,
 		unlockTopology,
-		autoRebuild
+		autoRebuild,
+		hasConflicts
 	} from '../store';
 	import type { Topology } from '../types/base';
 	import TopologyModal from './TopologyModal.svelte';
-	import { users } from '$lib/features/users/store';
 	import { getTopologyState } from '../state';
 	import StateBadge from './StateBadge.svelte';
 	import InlineDanger from '$lib/shared/components/feedback/InlineDanger.svelte';
@@ -33,8 +28,37 @@
 	import { TopologyDisplay } from '$lib/shared/components/forms/selection/display/TopologyDisplay.svelte';
 	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import { formatTimestamp } from '$lib/shared/utils/formatting';
+	import { useHostsQuery } from '$lib/features/hosts/queries';
+	import { useSubnetsQuery } from '$lib/features/subnets/queries';
+	import { useGroupsQuery } from '$lib/features/groups/queries';
+	import { useUsersQuery } from '$lib/features/users/queries';
+	import { useCurrentUserQuery } from '$lib/features/auth/queries';
+	import { permissions } from '$lib/shared/stores/metadata';
+	import { onMount } from 'svelte';
 
-	const loading = loadData([getHosts, getServices, getSubnets, getGroups, getTopologies]);
+	// Get current user to check permissions
+	const currentUserQuery = useCurrentUserQuery();
+	let currentUser = $derived(currentUserQuery.data);
+	let canViewUsers = $derived(
+		currentUser
+			? permissions.getMetadata(currentUser.permissions).can_manage_user_permissions.length > 0
+			: false
+	);
+
+	// Queries - TanStack Query handles deduplication
+	const hostsQuery = useHostsQuery();
+	const subnetsQuery = useSubnetsQuery();
+	const groupsQuery = useGroupsQuery();
+	const usersQuery = useUsersQuery({ enabled: () => canViewUsers });
+
+	// Derived data
+	let usersData = $derived(usersQuery.data ?? []);
+	let isLoading = $derived(hostsQuery.isPending || subnetsQuery.isPending || groupsQuery.isPending);
+
+	// Load topologies (still uses old store)
+	onMount(() => {
+		getTopologies();
+	});
 
 	let isCreateEditOpen = $state(false);
 	let editingTopology: Topology | null = $state(null);
@@ -94,14 +118,7 @@
 	async function handleRefresh() {
 		if (!$topology) return;
 
-		// Check if there are conflicts
-		const hasConflicts =
-			$topology.removed_hosts.length > 0 ||
-			$topology.removed_services.length > 0 ||
-			$topology.removed_subnets.length > 0 ||
-			$topology.removed_groups.length > 0;
-
-		if (hasConflicts) {
+		if (hasConflicts($topology)) {
 			// Open modal to review conflicts
 			isRefreshConflictsOpen = true;
 		} else {
@@ -150,7 +167,10 @@
 	);
 
 	let lockedByUser = $derived(
-		$topology?.locked_by ? $users.find((u) => u.id === $topology.locked_by) : null
+		$topology?.locked_by ? usersData.find((u) => u.id === $topology.locked_by) : null
+	);
+	let lockedByDisplay = $derived(
+		lockedByUser?.email ?? ($topology?.locked_by ? 'another user' : null)
 	);
 </script>
 
@@ -205,9 +225,7 @@
 						</div>
 						{#if $topology.is_locked && $topology.locked_at}
 							<span class="text-tertiary whitespace-nowrap text-[10px]"
-								>Locked: {formatTimestamp($topology.locked_at)} by {$users.find(
-									(u) => u.id == $topology.locked_by
-								)?.email}</span
+								>Locked: {formatTimestamp($topology.locked_at)} by {lockedByDisplay}</span
 							>
 						{:else}
 							<span class="text-tertiary whitespace-nowrap text-[10px]"
@@ -272,7 +290,7 @@
 			{#if stateConfig.type === 'locked'}
 				<InlineInfo
 					dismissableKey="topology-locked-info"
-					title={`Topology Locked ${lockedByUser ? `by ${lockedByUser.email}` : ''}`}
+					title={`Topology Locked${lockedByDisplay ? ` by ${lockedByDisplay}` : ''}`}
 					body="Data can't be refreshed while this topology is locked. You can still move and resize nodes and edges, but you won't be able to make any other changes. Click the badge above to unlock and enable data refresh."
 				/>
 			{:else if stateConfig.type === 'stale_conflicts'}
@@ -291,7 +309,7 @@
 			{/if}
 		{/if}
 
-		{#if $loading}
+		{#if isLoading}
 			<Loading />
 		{:else if $topology}
 			<div class="relative">
