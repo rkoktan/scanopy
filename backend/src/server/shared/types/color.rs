@@ -23,8 +23,6 @@ pub enum Color {
     Rose,
     Red,
     Orange,
-    #[default]
-    Yellow,
     Green,
     Emerald,
     Teal,
@@ -33,4 +31,7 @@ pub enum Color {
     Indigo,
     Purple,
     Gray,
+    #[default]
+    #[serde(other)]
+    Yellow,
 }

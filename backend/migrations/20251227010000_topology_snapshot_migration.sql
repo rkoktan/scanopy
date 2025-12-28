@@ -225,7 +225,7 @@ WHERE EXISTS (
 -- Old group_type: {"group_type": "RequestPath", "service_bindings": ["uuid1", ...]}
 -- New group_type: "RequestPath" (just the discriminant)
 -- New binding_ids: ["uuid1", ...] (from old service_bindings)
--- Color: normalize to INITCAP
+-- Color: normalize to valid Color enum value (empty/invalid -> Yellow default)
 
 UPDATE topologies
 SET groups = (
@@ -249,18 +249,30 @@ SET groups = (
             'binding_ids',
             COALESCE(grp->'group_type'->'service_bindings', '[]'::jsonb)
         )
-        -- Normalize color to INITCAP
-        || CASE
-            WHEN grp->>'color' IS NOT NULL AND grp->>'color' != INITCAP(grp->>'color') THEN
-                jsonb_build_object('color', INITCAP(grp->>'color'))
-            ELSE
-                '{}'::jsonb
-        END
+        -- Normalize color: empty/invalid -> Yellow (default), otherwise INITCAP
+        -- Valid colors: Pink, Rose, Red, Orange, Yellow, Green, Emerald, Teal, Cyan, Blue, Indigo, Purple, Gray
+        || jsonb_build_object(
+            'color',
+            CASE
+                -- Empty or null -> default to Yellow
+                WHEN grp->>'color' IS NULL OR grp->>'color' = '' THEN
+                    'Yellow'
+                -- Valid color -> normalize to INITCAP
+                WHEN INITCAP(grp->>'color') IN ('Pink', 'Rose', 'Red', 'Orange', 'Yellow', 'Green', 'Emerald', 'Teal', 'Cyan', 'Blue', 'Indigo', 'Purple', 'Gray') THEN
+                    INITCAP(grp->>'color')
+                -- Invalid color -> default to Yellow
+                ELSE
+                    'Yellow'
+            END
+        )
     ), '[]'::jsonb)
     FROM jsonb_array_elements(groups) AS grp
 )
 WHERE EXISTS (
     SELECT 1 FROM jsonb_array_elements(groups) g
     WHERE jsonb_typeof(g->'group_type') = 'object'
-       OR (g->>'color' IS NOT NULL AND g->>'color' != INITCAP(g->>'color'))
+       OR g->>'color' IS NULL
+       OR g->>'color' = ''
+       OR g->>'color' != INITCAP(g->>'color')
+       OR INITCAP(g->>'color') NOT IN ('Pink', 'Rose', 'Red', 'Orange', 'Yellow', 'Green', 'Emerald', 'Teal', 'Cyan', 'Blue', 'Indigo', 'Purple', 'Gray')
 );
