@@ -11916,6 +11916,7 @@
       "OrganizationBase": {
         "type": "object",
         "required": [
+          "stripe_customer_id",
           "name",
           "plan",
           "plan_status",
@@ -11942,6 +11943,13 @@
             ]
           },
           "plan_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "readOnly": true
+          },
+          "stripe_customer_id": {
             "type": [
               "string",
               "null"
@@ -12840,6 +12848,7 @@
         "enum": [
           "OrgCreated",
           "OnboardingModalCompleted",
+          "PlanSelected",
           "PersonalPlanSelected",
           "CommercialPlanSelected",
           "FirstApiKeyCreated",

@@ -3405,6 +3405,7 @@ export interface components {
 			onboarding: components['schemas']['TelemetryOperation'][];
 			plan: null | components['schemas']['BillingPlan'];
 			readonly plan_status: string | null;
+			readonly stripe_customer_id: string | null;
 		};
 		PlanConfig: {
 			/** Format: int64 */
@@ -3734,6 +3735,7 @@ export interface components {
 		TelemetryOperation:
 			| 'OrgCreated'
 			| 'OnboardingModalCompleted'
+			| 'PlanSelected'
 			| 'PersonalPlanSelected'
 			| 'CommercialPlanSelected'
 			| 'FirstApiKeyCreated'
