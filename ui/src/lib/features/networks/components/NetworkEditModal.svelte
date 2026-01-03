@@ -100,9 +100,9 @@
 </script>
 
 <GenericModal {isOpen} {title} size="xl" {onClose} onOpen={handleOpen} showCloseButton={true}>
-	<svelte:fragment slot="header-icon">
+	{#snippet headerIcon()}
 		<ModalHeaderIcon Icon={entities.getIconComponent('Network')} color={colorHelper.color} />
-	</svelte:fragment>
+	{/snippet}
 
 	<form
 		onsubmit={(e) => {

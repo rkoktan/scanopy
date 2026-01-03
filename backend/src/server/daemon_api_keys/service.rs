@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -9,16 +8,9 @@ use crate::server::{
     daemon_api_keys::r#impl::base::DaemonApiKey,
     shared::{
         api_key_common::ApiKeyService,
-        entities::ChangeTriggersTopologyStaleness,
-        events::{
-            bus::EventBus,
-            types::{EntityEvent, EntityOperation},
-        },
+        events::bus::EventBus,
         services::traits::{CrudService, EventBusService},
-        storage::{
-            generic::GenericPostgresStorage,
-            traits::{StorableEntity, Storage},
-        },
+        storage::generic::GenericPostgresStorage,
     },
 };
 
@@ -35,8 +27,20 @@ impl EventBusService<DaemonApiKey> for DaemonApiKeyService {
     fn get_network_id(&self, entity: &DaemonApiKey) -> Option<Uuid> {
         Some(entity.base.network_id)
     }
+
     fn get_organization_id(&self, _entity: &DaemonApiKey) -> Option<Uuid> {
         None
+    }
+
+    fn suppress_logs(
+        &self,
+        current: Option<&DaemonApiKey>,
+        updated: Option<&DaemonApiKey>,
+    ) -> bool {
+        match (current, updated) {
+            (Some(current), Some(updated)) => updated.suppress_logs(current),
+            _ => false,
+        }
     }
 }
 
@@ -45,46 +49,7 @@ impl CrudService<DaemonApiKey> for DaemonApiKeyService {
     fn storage(&self) -> &Arc<GenericPostgresStorage<DaemonApiKey>> {
         &self.storage
     }
-
-    /// Update entity
-    async fn update(
-        &self,
-        entity: &mut DaemonApiKey,
-        authentication: AuthenticatedEntity,
-    ) -> Result<DaemonApiKey, anyhow::Error> {
-        let current = self
-            .get_by_id(&entity.id())
-            .await?
-            .ok_or_else(|| anyhow!("Could not find {}", entity))?;
-        let updated = self.storage().update(entity).await?;
-
-        let suppress_logs = updated.suppress_logs(&current);
-        let trigger_stale = updated.triggers_staleness(Some(current));
-
-        self.event_bus()
-            .publish_entity(EntityEvent {
-                id: Uuid::new_v4(),
-                entity_id: updated.id(),
-                network_id: self.get_network_id(&updated),
-                organization_id: self.get_organization_id(&updated),
-                entity_type: updated.clone().into(),
-                operation: EntityOperation::Updated,
-                timestamp: Utc::now(),
-                metadata: serde_json::json!({
-                    "trigger_stale": trigger_stale,
-                    "suppress_logs": suppress_logs
-                }),
-                auth_method: authentication.auth_method(),
-                authentication,
-            })
-            .await?;
-
-        Ok(updated)
-    }
 }
-
-// Re-export shared API key functions for backwards compatibility
-pub use crate::server::shared::api_key_common::{ApiKeyType, hash_api_key};
 
 impl DaemonApiKeyService {
     pub fn new(

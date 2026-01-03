@@ -75,7 +75,7 @@ impl DaemonRuntimeService {
 
             tracing::info!(daemon_id = %daemon_id, "Checking for work...");
 
-            let path = format!("/api/daemons/{}/request-work", daemon_id);
+            let path = format!("/api/daemon/{}/request-work", daemon_id);
             let result: Result<(Option<DiscoveryUpdatePayload>, bool), _> = self
                 .api_client
                 .post(
@@ -141,7 +141,7 @@ impl DaemonRuntimeService {
                 continue;
             }
 
-            let path = format!("/api/daemons/{}/heartbeat", daemon_id);
+            let path = format!("/api/daemon/{}/heartbeat", daemon_id);
             match self
                 .api_client
                 .post_no_data::<_>(
@@ -284,7 +284,7 @@ impl DaemonRuntimeService {
             let result: Result<DaemonRegistrationResponse, _> = self
                 .api_client
                 .post(
-                    "/api/daemons/register",
+                    "/api/daemon/register",
                     &registration_request,
                     "Registration failed",
                 )
@@ -358,7 +358,7 @@ impl DaemonRuntimeService {
     /// - Receive server capabilities and deprecation warnings
     /// - Update last_seen timestamp
     pub async fn announce_startup(&self, daemon_id: Uuid) -> Result<()> {
-        let path = format!("/api/daemons/{}/startup", daemon_id);
+        let path = format!("/api/daemon/{}/startup", daemon_id);
 
         let request = DaemonStartupRequest {
             daemon_version: semver::Version::parse(env!("CARGO_PKG_VERSION"))?,

@@ -16,7 +16,7 @@ export function useApiKeysQuery() {
 	return createQuery(() => ({
 		queryKey: queryKeys.apiKeys.all,
 		queryFn: async () => {
-			const { data } = await apiClient.GET('/api/auth/daemon');
+			const { data } = await apiClient.GET('/api/v1/auth/daemon');
 			if (!data?.success || !data.data) {
 				throw new Error(data?.error || 'Failed to fetch API keys');
 			}
@@ -42,7 +42,7 @@ export function useCreateApiKeyMutation() {
 
 	return createMutation(() => ({
 		mutationFn: async (apiKey: ApiKey) => {
-			const { data } = await apiClient.POST('/api/auth/daemon', { body: apiKey });
+			const { data } = await apiClient.POST('/api/v1/auth/daemon', { body: apiKey });
 			if (!data?.success || !data.data) {
 				throw new Error(data?.error || 'Failed to create API key');
 			}
@@ -66,7 +66,7 @@ export function useUpdateApiKeyMutation() {
 
 	return createMutation(() => ({
 		mutationFn: async (apiKey: ApiKey) => {
-			const { data } = await apiClient.PUT('/api/auth/daemon/{id}', {
+			const { data } = await apiClient.PUT('/api/v1/auth/daemon/{id}', {
 				params: { path: { id: apiKey.id } },
 				body: apiKey
 			});
@@ -92,7 +92,7 @@ export function useDeleteApiKeyMutation() {
 
 	return createMutation(() => ({
 		mutationFn: async (id: string) => {
-			const { data } = await apiClient.DELETE('/api/auth/daemon/{id}', {
+			const { data } = await apiClient.DELETE('/api/v1/auth/daemon/{id}', {
 				params: { path: { id } }
 			});
 			if (!data?.success) {
@@ -117,7 +117,7 @@ export function useBulkDeleteApiKeysMutation() {
 
 	return createMutation(() => ({
 		mutationFn: async (ids: string[]) => {
-			const { data } = await apiClient.POST('/api/auth/daemon/bulk-delete', { body: ids });
+			const { data } = await apiClient.POST('/api/v1/auth/daemon/bulk-delete', { body: ids });
 			if (!data?.success) {
 				throw new Error(data?.error || 'Failed to delete API keys');
 			}
@@ -138,7 +138,7 @@ export function useBulkDeleteApiKeysMutation() {
 export function useRotateApiKeyMutation() {
 	return createMutation(() => ({
 		mutationFn: async (keyId: string) => {
-			const { data } = await apiClient.POST('/api/auth/daemon/{id}/rotate', {
+			const { data } = await apiClient.POST('/api/v1/auth/daemon/{id}/rotate', {
 				params: { path: { id: keyId } }
 			});
 			if (!data?.success || !data.data) {

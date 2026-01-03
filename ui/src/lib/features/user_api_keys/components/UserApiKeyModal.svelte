@@ -159,9 +159,9 @@
 	onOpen={handleOpen}
 	showCloseButton={true}
 >
-	<svelte:fragment slot="header-icon">
+	{#snippet headerIcon()}
 		<ModalHeaderIcon Icon={entities.getIconComponent('UserApiKey')} color={colorHelper.color} />
-	</svelte:fragment>
+	{/snippet}
 
 	<form
 		onsubmit={(e) => {

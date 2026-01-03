@@ -5,23 +5,6 @@
 //!
 //! Endpoints tagged with "internal" are included in the full spec (for client generation)
 //! but filtered out of the public Scalar documentation.
-//!
-//! ## Authentication Documentation
-//!
-//! Security requirements are documented using the `security()` attribute in handlers:
-//!
-//! ```rust
-//! #[utoipa::path(
-//!     security(("session" = []), ("user_api_key" = [])),
-//!     // ...
-//! )]
-//! async fn get_hosts(auth: Authorized<Viewer>) -> ...
-//! ```
-//!
-//! Available security schemes:
-//! - `session`: Browser session cookie
-//! - `user_api_key`: User API key (Bearer scp_u_...)
-//! - `daemon_api_key`: Daemon API key (Bearer scp_d_...)
 
 use axum::{Extension, Json, Router};
 use std::sync::Arc;
@@ -44,8 +27,8 @@ const INTERNAL_TAG: &str = "internal";
 #[openapi(
     info(
         title = "Scanopy API",
-        version = env!("CARGO_PKG_VERSION"),
-        description = "Network topology discovery and visualization API",
+        version = "1",
+        description = "Network topology discovery and visualization API. API version 1.",
         license(name = "Dual (AGPL3.0, Commercial License Available)")
     ),
     tags(
@@ -81,6 +64,7 @@ const INTERNAL_TAG: &str = "internal";
         (name = "services", description = "Services running on hosts. Detected or manually added services like databases, web servers, etc."),
         (name = "shares", description = "Shared network views. Create read-only shareable links to your network topology."),
         (name = "subnets", description = "IP subnets within networks. Define address ranges and organize hosts by subnet."),
+        (name = "system", description = "System information endpoints. Version and compatibility checking."),
         (name = "tags", description = "Custom tags for categorization. Apply labels to entities for filtering and organization."),
         (name = "users", description = "User account management. Manage user profiles and permissions within organizations."),
     )

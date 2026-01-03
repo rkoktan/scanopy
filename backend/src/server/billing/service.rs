@@ -713,7 +713,7 @@ impl BillingService {
                         "plan": plan.to_string(),
                         "is_commercial": plan.is_commercial()
                     }),
-                    auth_method: authentication.auth_method(),
+
                     authentication,
                 })
                 .await?;

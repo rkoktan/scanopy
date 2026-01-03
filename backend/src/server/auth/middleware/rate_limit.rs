@@ -39,12 +39,12 @@ static RATE_LIMITERS: OnceLock<RateLimiters> = OnceLock::new();
 fn get_limiters() -> &'static RateLimiters {
     RATE_LIMITERS.get_or_init(|| {
         let limiters = RateLimiters {
-            // Users: 5000 requests per hour
+            // Authenticated users and API keys: 300 requests per minute with burst of 150
             user: Arc::new(RateLimiter::keyed(
                 Quota::per_minute(NonZeroU32::new(300).unwrap())
                     .allow_burst(NonZeroU32::new(150).unwrap()),
             )),
-            // Anonymous: 20 requests per minute
+            // Anonymous/unauthenticated: 20 requests per minute with burst of 5
             anonymous: Arc::new(RateLimiter::keyed(
                 Quota::per_minute(NonZeroU32::new(20).unwrap())
                     .allow_burst(NonZeroU32::new(5).unwrap()),
@@ -163,6 +163,9 @@ pub async fn rate_limit_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, Response> {
+    #[cfg(feature = "generate-fixtures")]
+    return Ok(next.run(request).await);
+
     let path = request.uri().path();
 
     let exempt_paths = ["/api/billing/webhooks/", "/api/config", "/api/metadata"];
@@ -191,6 +194,7 @@ pub async fn rate_limit_middleware(
 
     let check_result = match entity {
         Some(AuthenticatedEntity::User { user_id, .. }) => check_user(user_id),
+        Some(AuthenticatedEntity::ApiKey { user_id, .. }) => check_user(user_id),
         _ => check_anonymous(ip),
     };
 

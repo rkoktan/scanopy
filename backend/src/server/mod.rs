@@ -3,7 +3,6 @@ pub mod billing;
 pub mod bindings;
 pub mod config;
 pub mod daemon_api_keys;
-pub mod daemon_api_keys;
 pub mod daemons;
 pub mod discovery;
 pub mod email;

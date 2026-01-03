@@ -109,7 +109,6 @@ pub async fn create_daemon_api_key(
                 metadata: serde_json::json!({
                     "is_onboarding_step": true
                 }),
-                auth_method: entity.auth_method(),
                 authentication: entity,
             })
             .await?;
@@ -151,7 +150,7 @@ pub async fn update_daemon_api_key(
     validate_network_access(Some(existing.base.network_id), &network_ids, "update")?;
 
     // Preserve the key hash - don't allow it to be changed via update
-    request.base.key = existing.base.key;
+    request.preserve_immutable_fields(&existing);
 
     // Delegate to generic handler
     update_handler::<DaemonApiKey>(State(state), auth, Path(id), Json(request)).await

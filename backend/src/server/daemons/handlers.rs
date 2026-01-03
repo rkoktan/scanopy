@@ -47,12 +47,18 @@ mod generated {
     crate::crud_bulk_delete_handler!(Daemon, "daemons");
 }
 
+/// User-facing daemon management endpoints (versioned at /api/v1/daemons)
 pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(get_all))
         .routes(routes!(get_by_id, generated::delete))
         .routes(routes!(generated::bulk_delete))
-        // Daemon-only endpoints (internal API - hidden from public docs)
+}
+
+/// Daemon-internal endpoints (unversioned at /api/daemon)
+/// These are called by daemons themselves, not by users.
+pub fn create_internal_router() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new()
         .routes(routes!(register_daemon))
         .routes(routes!(daemon_startup))
         .routes(routes!(receive_heartbeat))
@@ -170,20 +176,11 @@ async fn register_daemon(
     auth: Authorized<IsDaemon>,
     Json(request): Json<DaemonRegistrationRequest>,
 ) -> ApiResult<Json<ApiResponse<DaemonRegistrationResponse>>> {
-    let daemon_network_id = auth.network_ids()[0];
-
-    // Validate daemon is registering on its authorized network
-    if request.network_id != daemon_network_id {
-        return Err(ApiError::forbidden(
-            "Cannot register daemon on a different network than authorized",
-        ));
-    }
-
     // Check if this is a demo organization - block daemon registration
     let network = state
         .services
         .network_service
-        .get_by_id(&daemon_network_id)
+        .get_by_id(&request.network_id)
         .await?
         .ok_or_else(|| ApiError::not_found("Network not found".to_string()))?;
 
@@ -334,7 +331,7 @@ async fn register_daemon(
                 metadata: serde_json::json!({
                     "is_onboarding_step": true
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;

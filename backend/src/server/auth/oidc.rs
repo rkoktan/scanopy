@@ -184,7 +184,7 @@ impl OidcService {
                     "provider": provider.slug,
                     "provider_name": provider.name
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -236,7 +236,7 @@ impl OidcService {
                     "provider": provider.slug,
                     "provider_name": provider.name
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -321,7 +321,7 @@ impl OidcService {
                     "provider": provider.slug,
                     "provider_name": provider.name
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication: authentication.clone(),
             })
             .await?;
@@ -377,7 +377,7 @@ impl OidcService {
                     "provider": provider.slug,
                     "provider_name": provider.name
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication: authentication.clone(),
             })
             .await?;

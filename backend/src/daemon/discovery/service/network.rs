@@ -692,7 +692,7 @@ impl DiscoveryRunner<NetworkScanDiscovery> {
     async fn get_subnets(&self) -> Result<Vec<Subnet>, Error> {
         self.as_ref()
             .api_client
-            .get("/api/subnets", "Failed to get subnets")
+            .get("/api/v1/subnets", "Failed to get subnets")
             .await
     }
 }

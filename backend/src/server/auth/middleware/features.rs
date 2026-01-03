@@ -113,17 +113,6 @@ where
 // ============ Concrete Checkers ============
 
 #[derive(Default)]
-pub struct EmbedsFeature;
-
-#[async_trait]
-impl FeatureCheck for EmbedsFeature {
-    async fn check(&self, _ctx: &FeatureCheckContext<'_>) -> FeatureCheckResult {
-        // Embed check happens in the handler where we have access to the request body
-        FeatureCheckResult::Allowed
-    }
-}
-
-#[derive(Default)]
 pub struct InviteUsersFeature;
 
 #[async_trait]
@@ -134,6 +123,20 @@ impl FeatureCheck for InviteUsersFeature {
         }
 
         // Seat check happens in the handler where we have access to the request body
+        FeatureCheckResult::Allowed
+    }
+}
+
+#[derive(Default)]
+pub struct ApiKeyFeature;
+
+#[async_trait]
+impl FeatureCheck for ApiKeyFeature {
+    async fn check(&self, ctx: &FeatureCheckContext<'_>) -> FeatureCheckResult {
+        if !ctx.plan.features().api_access {
+            return FeatureCheckResult::payment_required("Your plan does not include api access");
+        }
+
         FeatureCheckResult::Allowed
     }
 }

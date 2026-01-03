@@ -1,7 +1,4 @@
-use crate::server::{
-    auth::middleware::auth::{AuthMethod, AuthenticatedEntity},
-    shared::entities::Entity,
-};
+use crate::server::{auth::middleware::auth::AuthenticatedEntity, shared::entities::Entity};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, net::IpAddr};
@@ -273,7 +270,6 @@ pub struct AuthEvent {
     pub user_agent: Option<String>,
     pub metadata: serde_json::Value,
     pub authentication: AuthenticatedEntity,
-    pub auth_method: AuthMethod,
 }
 
 impl AuthEvent {
@@ -290,7 +286,6 @@ impl AuthEvent {
         metadata: serde_json::Value,
         authentication: AuthenticatedEntity,
     ) -> Self {
-        let auth_method = authentication.auth_method();
         Self {
             id,
             user_id,
@@ -301,7 +296,6 @@ impl AuthEvent {
             user_agent,
             metadata,
             authentication,
-            auth_method,
         }
     }
 }
@@ -315,7 +309,6 @@ impl PartialEq for AuthEvent {
             && self.user_agent == other.user_agent
             && self.metadata == other.metadata
             && self.authentication == other.authentication
-            && self.auth_method == other.auth_method
     }
 }
 
@@ -361,7 +354,6 @@ pub struct EntityEvent {
     pub operation: EntityOperation,
     pub timestamp: DateTime<Utc>,
     pub authentication: AuthenticatedEntity,
-    pub auth_method: AuthMethod,
     pub metadata: serde_json::Value,
 }
 
@@ -379,7 +371,6 @@ impl EntityEvent {
         authentication: AuthenticatedEntity,
         metadata: serde_json::Value,
     ) -> Self {
-        let auth_method = authentication.auth_method();
         Self {
             id,
             entity_type,
@@ -389,7 +380,6 @@ impl EntityEvent {
             operation,
             timestamp,
             authentication,
-            auth_method,
             metadata,
         }
     }
@@ -402,7 +392,6 @@ impl PartialEq for EntityEvent {
             && self.organization_id == other.organization_id
             && self.operation == other.operation
             && self.authentication == other.authentication
-            && self.auth_method == other.auth_method
             && self.metadata == other.metadata
     }
 }
@@ -449,7 +438,6 @@ pub struct TelemetryEvent {
     pub operation: TelemetryOperation,
     pub timestamp: DateTime<Utc>,
     pub authentication: AuthenticatedEntity,
-    pub auth_method: AuthMethod,
     pub metadata: serde_json::Value,
 }
 
@@ -463,14 +451,12 @@ impl TelemetryEvent {
         authentication: AuthenticatedEntity,
         metadata: serde_json::Value,
     ) -> Self {
-        let auth_method = authentication.auth_method();
         Self {
             id,
             organization_id,
             operation,
             timestamp,
             authentication,
-            auth_method,
             metadata,
         }
     }

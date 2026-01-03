@@ -82,9 +82,9 @@
 	{activeTab}
 	onTabChange={handleTabChange}
 >
-	<svelte:fragment slot="header-icon">
+	{#snippet headerIcon()}
 		<ModalHeaderIcon Icon={Settings} color="Blue" />
-	</svelte:fragment>
+	{/snippet}
 
 	<div class="flex h-[calc(100vh-16rem)] flex-col">
 		{#if activeTab === 'account'}

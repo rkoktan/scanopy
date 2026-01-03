@@ -12,6 +12,7 @@
 </script>
 
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { X } from 'lucide-svelte';
 
 	let {
@@ -27,7 +28,10 @@
 		activeTab = $bindable(''),
 		onTabChange = null,
 		onOpen = null,
-		instanceKey = $bindable(0)
+		instanceKey = $bindable(0),
+		headerIcon,
+		children,
+		footer
 	}: {
 		title?: string;
 		centerTitle?: boolean;
@@ -42,6 +46,9 @@
 		onTabChange?: ((tabId: string) => void) | null;
 		onOpen?: (() => void) | null;
 		instanceKey?: number;
+		headerIcon?: Snippet;
+		children?: Snippet<[number]>;
+		footer?: Snippet;
 	} = $props();
 
 	// Track previous open state to detect open transition
@@ -126,7 +133,7 @@
 				<!-- Title row -->
 				<div class="flex w-full items-center justify-between">
 					{#if centerTitle}
-						<slot name="header-icon" />
+						{@render headerIcon?.()}
 						<h2
 							id="modal-title"
 							class="text-primary absolute left-1/2 -translate-x-1/2 text-xl font-semibold"
@@ -135,7 +142,7 @@
 						</h2>
 					{:else}
 						<div class="flex items-center gap-3">
-							<slot name="header-icon" />
+							{@render headerIcon?.()}
 							<h2 id="modal-title" class="text-primary text-xl font-semibold">
 								{title}
 							</h2>
@@ -176,11 +183,11 @@
 
 			<!-- Content slot -->
 			<div class="modal-content">
-				<slot {instanceKey} />
+				{@render children?.(instanceKey)}
 			</div>
 
 			<!-- Footer slot -->
-			<slot name="footer" />
+			{@render footer?.()}
 		</div>
 	</div>
 {/if}

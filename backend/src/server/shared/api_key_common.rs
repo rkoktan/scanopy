@@ -202,7 +202,6 @@ pub trait ApiKeyService: CrudService<Self::Key> + EventBusService<Self::Key> {
                     "api_key_id": api_key_id,
                     "key_type": format!("{:?}", Self::Key::KEY_TYPE),
                 }),
-                auth_method: entity.auth_method(),
                 authentication: entity.clone(),
             })
             .await?;

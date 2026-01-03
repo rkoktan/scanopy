@@ -1,4 +1,4 @@
-use crate::server::auth::middleware::auth::{AuthMethod, AuthenticatedEntity};
+use crate::server::auth::middleware::auth::AuthenticatedEntity;
 use crate::server::daemons::r#impl::base::DaemonMode;
 use crate::server::discovery::r#impl::types::RunType;
 use crate::server::shared::entities::ChangeTriggersTopologyStaleness;
@@ -172,7 +172,7 @@ impl DiscoveryService {
                 metadata: serde_json::json!({
                     "trigger_stale": trigger_stale
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -243,7 +243,7 @@ impl DiscoveryService {
                 metadata: serde_json::json!({
                     "trigger_stale": trigger_stale
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -286,7 +286,7 @@ impl DiscoveryService {
                 metadata: serde_json::json!({
                     "trigger_stale": trigger_stale
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -574,7 +574,6 @@ impl DiscoveryService {
                         metadata: serde_json::json!({
                             "type": "historical"
                         }),
-                        auth_method: AuthMethod::System,
                         authentication: AuthenticatedEntity::System,
                     })
                     .await?;

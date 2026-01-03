@@ -1,14 +1,17 @@
 use crate::server::{
     auth::middleware::{
-        features::{BlockedInDemoMode, RequireFeature},
-        permissions::{Authorized, IsUser},
+        features::{ApiKeyFeature, BlockedInDemoMode, RequireFeature},
+        permissions::{Authorized, IsUser, Member, Viewer},
     },
     config::AppState,
     shared::{
         api_key_common::{ApiKeyService, ApiKeyType, generate_api_key_for_storage},
+        handlers::traits::{
+            BulkDeleteResponse, CrudHandlers, bulk_delete_handler, delete_handler,
+            get_by_id_handler,
+        },
         services::traits::CrudService,
-        storage::traits::StorableEntity,
-        types::api::{ApiError, ApiErrorResponse, ApiResponse, ApiResult},
+        types::api::{ApiError, ApiErrorResponse, ApiResponse, ApiResult, EmptyApiResponse},
     },
     user_api_keys::{
         r#impl::{api::UserApiKeyResponse, base::UserApiKey},
@@ -25,20 +28,13 @@ use std::sync::Arc;
 use utoipa_axum::{router::OpenApiRouter, routes};
 use uuid::Uuid;
 
-mod generated {
-    use super::*;
-    crate::crud_get_by_id_handler!(UserApiKey, "user_api_keys", "user_api_key");
-    crate::crud_delete_handler!(UserApiKey, "user_api_keys", "user_api_key");
-    crate::crud_bulk_delete_handler!(UserApiKey, "user_api_keys");
-}
-
 pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
         .routes(routes!(get_all, create_user_api_key))
-        .routes(routes!(generated::get_by_id, generated::delete))
+        .routes(routes!(get_by_id, delete))
         .routes(routes!(update_user_api_key))
         .routes(routes!(rotate_key_handler))
-        .routes(routes!(generated::bulk_delete))
+        .routes(routes!(bulk_delete))
 }
 
 /// Get all user API keys for the current user
@@ -56,6 +52,7 @@ pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
 )]
 pub async fn get_all(
     State(state): State<Arc<AppState>>,
+    _feature: RequireFeature<ApiKeyFeature>,
     auth: Authorized<IsUser>,
 ) -> ApiResult<Json<ApiResponse<Vec<UserApiKey>>>> {
     let user_id = auth.require_user_id()?;
@@ -90,6 +87,7 @@ pub async fn get_all(
 pub async fn create_user_api_key(
     State(state): State<Arc<AppState>>,
     auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
     _demo_check: RequireFeature<BlockedInDemoMode>,
     Json(mut api_key): Json<UserApiKey>,
 ) -> ApiResult<Json<ApiResponse<UserApiKeyResponse>>> {
@@ -158,6 +156,8 @@ pub async fn create_user_api_key(
 pub async fn update_user_api_key(
     State(state): State<Arc<AppState>>,
     auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
+    _demo_check: RequireFeature<BlockedInDemoMode>,
     Path(id): Path<Uuid>,
     Json(mut request): Json<UserApiKey>,
 ) -> ApiResult<Json<ApiResponse<UserApiKey>>> {
@@ -187,12 +187,7 @@ pub async fn update_user_api_key(
         .map_err(|e| ApiError::forbidden(&e))?;
 
     // Preserve immutable fields
-    request.base.key = existing.base.key.clone();
-    request.base.last_used = existing.base.last_used;
-    request.base.user_id = existing.base.user_id;
-    request.base.organization_id = existing.base.organization_id;
-    request.set_id(existing.id());
-    request.set_created_at(existing.created_at());
+    request.preserve_immutable_fields(&existing);
 
     // Update network access
     let network_ids = request.base.network_ids.clone();
@@ -228,6 +223,7 @@ pub async fn update_user_api_key(
 pub async fn rotate_key_handler(
     State(state): State<Arc<AppState>>,
     auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
     _demo_check: RequireFeature<BlockedInDemoMode>,
     ClientIp(ip): ClientIp,
     user_agent: Option<TypedHeader<UserAgent>>,
@@ -251,4 +247,116 @@ pub async fn rotate_key_handler(
         })?;
 
     Ok(Json(ApiResponse::success(key)))
+}
+
+/// Get a user API key by ID
+#[utoipa::path(
+    get,
+    path = "/{id}",
+    tag = "user_api_keys",
+    operation_id = "get_user_api_key_by_id",
+    params(("id" = Uuid, Path, description = "API key ID")),
+    responses(
+        (status = 200, description = "API key found", body = ApiResponse<UserApiKey>),
+        (status = 404, description = "API key not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+pub async fn get_by_id(
+    state: State<Arc<AppState>>,
+    auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<ApiResponse<UserApiKey>>> {
+    let user_id = auth.user_id().unwrap_or(Uuid::nil());
+    let result =
+        get_by_id_handler::<UserApiKey>(state, auth.into_permission::<Viewer>(), Path(id)).await?;
+
+    if result
+        .data
+        .as_ref()
+        .map(|k| k.base.user_id != user_id)
+        .unwrap_or(true)
+    {
+        return Err(ApiError::not_found(format!("API key '{}' not found", id)));
+    }
+    Ok(result)
+}
+
+/// Delete a user API key
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    tag = "user_api_keys",
+    operation_id = "delete_user_api_key",
+    params(("id" = Uuid, Path, description = "API key ID")),
+    responses(
+        (status = 200, description = "API key deleted", body = EmptyApiResponse),
+        (status = 404, description = "API key not found", body = ApiErrorResponse),
+    ),
+    security(("session" = []))
+)]
+pub async fn delete(
+    state: State<Arc<AppState>>,
+    auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
+    _demo_check: RequireFeature<BlockedInDemoMode>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Json<ApiResponse<()>>> {
+    let user_id = auth.user_id().unwrap_or(Uuid::nil());
+
+    // Verify ownership before deleting
+    let key = state.services.user_api_key_service.get_by_id(&id).await?;
+    if key
+        .as_ref()
+        .map(|k| k.base.user_id != user_id)
+        .unwrap_or(true)
+    {
+        return Err(ApiError::not_found(format!("API key '{}' not found", id)));
+    }
+
+    delete_handler::<UserApiKey>(state, auth.into_permission::<Member>(), Path(id)).await
+}
+
+/// Bulk delete user API keys
+#[utoipa::path(
+    post,
+    path = "/bulk-delete",
+    tag = "user_api_keys",
+    operation_id = "bulk_delete_user_api_keys",
+    request_body(content = Vec<Uuid>, description = "Array of API key IDs to delete"),
+    responses(
+        (status = 200, description = "API keys deleted", body = ApiResponse<BulkDeleteResponse>),
+    ),
+    security(("session" = []))
+)]
+pub async fn bulk_delete(
+    state: State<Arc<AppState>>,
+    auth: Authorized<IsUser>,
+    _feature: RequireFeature<ApiKeyFeature>,
+    _demo_check: RequireFeature<BlockedInDemoMode>,
+    Json(ids): Json<Vec<Uuid>>,
+) -> ApiResult<Json<ApiResponse<BulkDeleteResponse>>> {
+    let user_id = auth.user_id().unwrap_or(Uuid::nil());
+    let service = &state.services.user_api_key_service;
+
+    // Filter to only keys owned by this user
+    let mut owned_ids = Vec::new();
+    for id in &ids {
+        if let Ok(Some(key)) = service.get_by_id(id).await
+            && key.base.user_id == user_id
+        {
+            owned_ids.push(*id);
+        }
+    }
+
+    let result =
+        bulk_delete_handler::<UserApiKey>(state, auth.into_permission::<Member>(), Json(owned_ids))
+            .await?;
+
+    // Combine counts
+    Ok(Json(ApiResponse::success(BulkDeleteResponse {
+        deleted_count: result.data.as_ref().map(|r| r.deleted_count).unwrap_or(0),
+        requested_count: ids.len(),
+    })))
 }

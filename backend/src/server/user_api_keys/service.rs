@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -8,16 +7,9 @@ use crate::server::{
     auth::middleware::auth::AuthenticatedEntity,
     shared::{
         api_key_common::ApiKeyService,
-        entities::ChangeTriggersTopologyStaleness,
-        events::{
-            bus::EventBus,
-            types::{EntityEvent, EntityOperation},
-        },
+        events::bus::EventBus,
         services::traits::{CrudService, EventBusService},
-        storage::{
-            generic::GenericPostgresStorage,
-            traits::{StorableEntity, Storage},
-        },
+        storage::generic::GenericPostgresStorage,
     },
     user_api_keys::r#impl::{base::UserApiKey, network_access::UserApiKeyNetworkAccessStorage},
     users::r#impl::permissions::UserOrgPermissions,
@@ -42,48 +34,19 @@ impl EventBusService<UserApiKey> for UserApiKeyService {
     fn get_organization_id(&self, entity: &UserApiKey) -> Option<Uuid> {
         Some(entity.base.organization_id)
     }
+
+    fn suppress_logs(&self, current: Option<&UserApiKey>, updated: Option<&UserApiKey>) -> bool {
+        match (current, updated) {
+            (Some(current), Some(updated)) => updated.suppress_logs(current),
+            _ => false,
+        }
+    }
 }
 
 #[async_trait]
 impl CrudService<UserApiKey> for UserApiKeyService {
     fn storage(&self) -> &Arc<GenericPostgresStorage<UserApiKey>> {
         &self.storage
-    }
-
-    /// Update entity
-    async fn update(
-        &self,
-        entity: &mut UserApiKey,
-        authentication: AuthenticatedEntity,
-    ) -> Result<UserApiKey, anyhow::Error> {
-        let current = self
-            .get_by_id(&entity.id())
-            .await?
-            .ok_or_else(|| anyhow!("Could not find {}", entity))?;
-        let updated = self.storage().update(entity).await?;
-
-        let suppress_logs = updated.suppress_logs(&current);
-        let trigger_stale = updated.triggers_staleness(Some(current));
-
-        self.event_bus()
-            .publish_entity(EntityEvent {
-                id: Uuid::new_v4(),
-                entity_id: updated.id(),
-                network_id: self.get_network_id(&updated),
-                organization_id: self.get_organization_id(&updated),
-                entity_type: updated.clone().into(),
-                operation: EntityOperation::Updated,
-                timestamp: Utc::now(),
-                metadata: serde_json::json!({
-                    "trigger_stale": trigger_stale,
-                    "suppress_logs": suppress_logs
-                }),
-                auth_method: authentication.auth_method(),
-                authentication,
-            })
-            .await?;
-
-        Ok(updated)
     }
 }
 
@@ -151,16 +114,10 @@ impl UserApiKeyService {
     }
 
     /// Validate that the requested network access is a subset of the user's network access
-    /// and that at least one network is selected
     pub fn validate_network_access(
         key_network_ids: &[Uuid],
         user_network_ids: &[Uuid],
     ) -> Result<(), String> {
-        // Require at least one network - empty network_ids would make the key useless
-        if key_network_ids.is_empty() {
-            return Err("At least one network must be selected".to_string());
-        }
-
         for network_id in key_network_ids {
             if !user_network_ids.contains(network_id) {
                 return Err(format!("You don't have access to network {}", network_id));

@@ -1,9 +1,8 @@
 use crate::infra::{BASE_URL, TestContext};
 use cidr::{IpCidr, Ipv4Cidr};
 use reqwest::StatusCode;
-use scanopy::server::daemon_api_keys::r#impl::base::DaemonApiKey;
-use scanopy::server::daemon_api_keys::r#impl::base::DaemonApiKeyBase;
-use scanopy::server::daemon_api_keys::r#impl::base::DaemonApiKeyBase;
+use scanopy::server::daemon_api_keys::r#impl::api::DaemonApiKeyResponse;
+use scanopy::server::daemon_api_keys::r#impl::base::{DaemonApiKey, DaemonApiKeyBase};
 use scanopy::server::groups::r#impl::base::{Group, GroupBase};
 use scanopy::server::groups::r#impl::types::GroupType;
 use scanopy::server::hosts::r#impl::api::{CreateHostRequest, HostResponse, UpdateHostRequest};
@@ -16,7 +15,9 @@ use scanopy::server::subnets::r#impl::base::{Subnet, SubnetBase};
 use scanopy::server::subnets::r#impl::types::SubnetType;
 use scanopy::server::tags::r#impl::base::{Tag, TagBase};
 use scanopy::server::topology::types::edges::EdgeStyle;
+use scanopy::server::user_api_keys::r#impl::api::UserApiKeyResponse;
 use scanopy::server::user_api_keys::r#impl::base::{UserApiKey, UserApiKeyBase};
+use scanopy::server::users::r#impl::base::{User, UserBase};
 use scanopy::server::users::r#impl::permissions::UserOrgPermissions;
 use std::net::Ipv4Addr;
 use uuid::Uuid;
@@ -55,14 +56,14 @@ async fn test_subnet_crud(ctx: &TestContext) -> Result<(), String> {
         tags: Vec::new(),
     });
 
-    let created: Subnet = ctx.client.post("/api/subnets", &subnet).await?;
+    let created: Subnet = ctx.client.post("/api/v1/subnets", &subnet).await?;
     assert!(!created.id.is_nil(), "Created subnet should have an ID");
     assert_eq!(created.base.name, "Test Subnet");
     println!("  ✓ Create subnet");
 
     let fetched: Subnet = ctx
         .client
-        .get(&format!("/api/subnets/{}", created.id))
+        .get(&format!("/api/v1/subnets/{}", created.id))
         .await?;
     assert_eq!(fetched.id, created.id);
     println!("  ✓ Read subnet");
@@ -71,24 +72,24 @@ async fn test_subnet_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated Subnet".to_string();
     let updated: Subnet = ctx
         .client
-        .put(&format!("/api/subnets/{}", updated.id), &updated)
+        .put(&format!("/api/v1/subnets/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated Subnet");
     println!("  ✓ Update subnet");
 
-    let subnets: Vec<Subnet> = ctx.client.get("/api/subnets").await?;
+    let subnets: Vec<Subnet> = ctx.client.get("/api/v1/subnets").await?;
     assert!(subnets.iter().any(|s| s.id == created.id));
     println!("  ✓ List subnets");
 
     ctx.client
-        .delete_no_content(&format!("/api/subnets/{}", created.id))
+        .delete_no_content(&format!("/api/v1/subnets/{}", created.id))
         .await?;
     println!("  ✓ Delete subnet");
 
     let result = ctx
         .client
         .get_expect_status(
-            &format!("/api/subnets/{}", created.id),
+            &format!("/api/v1/subnets/{}", created.id),
             StatusCode::NOT_FOUND,
         )
         .await;
@@ -114,14 +115,14 @@ async fn test_host_crud(ctx: &TestContext) -> Result<(), String> {
         ports: vec![],
     };
 
-    let created: HostResponse = ctx.client.post("/api/hosts", &request).await?;
+    let created: HostResponse = ctx.client.post("/api/v1/hosts", &request).await?;
     assert!(!created.id.is_nil(), "Created host should have an ID");
     assert_eq!(created.name, "Test Host");
     println!("  ✓ Create host");
 
     let fetched: HostResponse = ctx
         .client
-        .get(&format!("/api/hosts/{}", created.id))
+        .get(&format!("/api/v1/hosts/{}", created.id))
         .await?;
     assert_eq!(fetched.id, created.id);
     println!("  ✓ Read host");
@@ -140,17 +141,17 @@ async fn test_host_crud(ctx: &TestContext) -> Result<(), String> {
     };
     let updated: HostResponse = ctx
         .client
-        .put(&format!("/api/hosts/{}", created.id), &update_request)
+        .put(&format!("/api/v1/hosts/{}", created.id), &update_request)
         .await?;
     assert_eq!(updated.name, "Updated Host");
     println!("  ✓ Update host");
 
-    let hosts: Vec<HostResponse> = ctx.client.get("/api/hosts").await?;
+    let hosts: Vec<HostResponse> = ctx.client.get("/api/v1/hosts").await?;
     assert!(hosts.iter().any(|h| h.id == created.id));
     println!("  ✓ List hosts");
 
     ctx.client
-        .delete_no_content(&format!("/api/hosts/{}", created.id))
+        .delete_no_content(&format!("/api/v1/hosts/{}", created.id))
         .await?;
     println!("  ✓ Delete host");
 
@@ -172,7 +173,7 @@ async fn test_service_crud(ctx: &TestContext) -> Result<(), String> {
         interfaces: vec![],
         ports: vec![],
     };
-    let created_host: HostResponse = ctx.client.post("/api/hosts", &host_request).await?;
+    let created_host: HostResponse = ctx.client.post("/api/v1/hosts", &host_request).await?;
 
     let service_def = ServiceDefinitionRegistry::find_by_id("Dns Server")
         .unwrap_or_else(|| ServiceDefinitionRegistry::all_service_definitions()[0].clone());
@@ -188,14 +189,14 @@ async fn test_service_crud(ctx: &TestContext) -> Result<(), String> {
         tags: Vec::new(),
     });
 
-    let created: Service = ctx.client.post("/api/services", &service).await?;
+    let created: Service = ctx.client.post("/api/v1/services", &service).await?;
     assert!(!created.id.is_nil());
     assert_eq!(created.base.name, "Test Service");
     println!("  ✓ Create service");
 
     let fetched: Service = ctx
         .client
-        .get(&format!("/api/services/{}", created.id))
+        .get(&format!("/api/v1/services/{}", created.id))
         .await?;
     assert_eq!(fetched.id, created.id);
     println!("  ✓ Read service");
@@ -204,22 +205,22 @@ async fn test_service_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated Service".to_string();
     let updated: Service = ctx
         .client
-        .put(&format!("/api/services/{}", updated.id), &updated)
+        .put(&format!("/api/v1/services/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated Service");
     println!("  ✓ Update service");
 
-    let services: Vec<Service> = ctx.client.get("/api/services").await?;
+    let services: Vec<Service> = ctx.client.get("/api/v1/services").await?;
     assert!(services.iter().any(|s| s.id == created.id));
     println!("  ✓ List services");
 
     ctx.client
-        .delete_no_content(&format!("/api/services/{}", created.id))
+        .delete_no_content(&format!("/api/v1/services/{}", created.id))
         .await?;
     println!("  ✓ Delete service");
 
     ctx.client
-        .delete_no_content(&format!("/api/hosts/{}", created_host.id))
+        .delete_no_content(&format!("/api/v1/hosts/{}", created_host.id))
         .await?;
 
     println!("✅ Service CRUD passed");
@@ -241,14 +242,14 @@ async fn test_group_crud(ctx: &TestContext) -> Result<(), String> {
         tags: Vec::new(),
     });
 
-    let created: Group = ctx.client.post("/api/groups", &group).await?;
+    let created: Group = ctx.client.post("/api/v1/groups", &group).await?;
     assert!(!created.id.is_nil());
     assert_eq!(created.base.name, "Test Group");
     println!("  ✓ Create group");
 
     let fetched: Group = ctx
         .client
-        .get(&format!("/api/groups/{}", created.id))
+        .get(&format!("/api/v1/groups/{}", created.id))
         .await?;
     assert_eq!(fetched.id, created.id);
     println!("  ✓ Read group");
@@ -257,17 +258,17 @@ async fn test_group_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated Group".to_string();
     let updated: Group = ctx
         .client
-        .put(&format!("/api/groups/{}", updated.id), &updated)
+        .put(&format!("/api/v1/groups/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated Group");
     println!("  ✓ Update group");
 
-    let groups: Vec<Group> = ctx.client.get("/api/groups").await?;
+    let groups: Vec<Group> = ctx.client.get("/api/v1/groups").await?;
     assert!(groups.iter().any(|g| g.id == created.id));
     println!("  ✓ List groups");
 
     ctx.client
-        .delete_no_content(&format!("/api/groups/{}", created.id))
+        .delete_no_content(&format!("/api/v1/groups/{}", created.id))
         .await?;
     println!("  ✓ Delete group");
 
@@ -282,12 +283,15 @@ async fn test_tag_crud(ctx: &TestContext) -> Result<(), String> {
     tag.base.organization_id = ctx.organization_id;
     tag.base.name = "Test Tag".to_string();
 
-    let created: Tag = ctx.client.post("/api/tags", &tag).await?;
+    let created: Tag = ctx.client.post("/api/v1/tags", &tag).await?;
     assert!(!created.id.is_nil());
     assert_eq!(created.base.name, "Test Tag");
     println!("  ✓ Create tag");
 
-    let fetched: Tag = ctx.client.get(&format!("/api/tags/{}", created.id)).await?;
+    let fetched: Tag = ctx
+        .client
+        .get(&format!("/api/v1/tags/{}", created.id))
+        .await?;
     assert_eq!(fetched.id, created.id);
     println!("  ✓ Read tag");
 
@@ -295,17 +299,17 @@ async fn test_tag_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated Tag".to_string();
     let updated: Tag = ctx
         .client
-        .put(&format!("/api/tags/{}", updated.id), &updated)
+        .put(&format!("/api/v1/tags/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated Tag");
     println!("  ✓ Update tag");
 
-    let tags: Vec<Tag> = ctx.client.get("/api/tags").await?;
+    let tags: Vec<Tag> = ctx.client.get("/api/v1/tags").await?;
     assert!(tags.iter().any(|t| t.id == created.id));
     println!("  ✓ List tags");
 
     ctx.client
-        .delete_no_content(&format!("/api/tags/{}", created.id))
+        .delete_no_content(&format!("/api/v1/tags/{}", created.id))
         .await?;
     println!("  ✓ Delete tag");
 
@@ -326,22 +330,15 @@ async fn test_api_key_crud(ctx: &TestContext) -> Result<(), String> {
         tags: Vec::new(),
     });
 
-    // Daemon API keys are now at /api/auth/daemon
-    let created: serde_json::Value = ctx.client.post("/api/auth/daemon", &api_key).await?;
-    let created_key = created["api_key"].clone();
-    let key_id = created_key["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
-    assert!(
-        created["key"].as_str().is_some(),
-        "Should return plaintext key"
-    );
+    // Daemon API keys are now at /api/v1/auth/daemon
+    let created: DaemonApiKeyResponse = ctx.client.post("/api/v1/auth/daemon", &api_key).await?;
+    let key_id = created.api_key.id;
+    assert!(!created.key.is_empty(), "Should return plaintext key");
     println!("  ✓ Create daemon API key (received plaintext key)");
 
     let fetched: DaemonApiKey = ctx
         .client
-        .get(&format!("/api/auth/daemon/{}", key_id))
+        .get(&format!("/api/v1/auth/daemon/{}", key_id))
         .await?;
     assert_eq!(fetched.id, key_id);
     println!("  ✓ Read daemon API key");
@@ -350,7 +347,7 @@ async fn test_api_key_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated Daemon API Key".to_string();
     let updated: DaemonApiKey = ctx
         .client
-        .put(&format!("/api/auth/daemon/{}", updated.id), &updated)
+        .put(&format!("/api/v1/auth/daemon/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated Daemon API Key");
     assert_eq!(
@@ -359,12 +356,12 @@ async fn test_api_key_crud(ctx: &TestContext) -> Result<(), String> {
     );
     println!("  ✓ Update daemon API key (key hash preserved)");
 
-    let keys: Vec<DaemonApiKey> = ctx.client.get("/api/auth/daemon").await?;
+    let keys: Vec<DaemonApiKey> = ctx.client.get("/api/v1/auth/daemon").await?;
     assert!(keys.iter().any(|k| k.id == key_id));
     println!("  ✓ List daemon API keys");
 
     ctx.client
-        .delete_no_content(&format!("/api/auth/daemon/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/daemon/{}", key_id))
         .await?;
     println!("  ✓ Delete daemon API key");
 
@@ -388,22 +385,15 @@ async fn test_user_api_key_crud(ctx: &TestContext) -> Result<(), String> {
         network_ids: vec![ctx.network_id],
     });
 
-    // User API keys are at /api/auth/keys
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let created_key = created["api_key"].clone();
-    let key_id = created_key["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
-    assert!(
-        created["key"].as_str().is_some(),
-        "Should return plaintext key"
-    );
+    // User API keys are at /api/v1/auth/keys
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let key_id = created.api_key.id;
+    assert!(!created.key.is_empty(), "Should return plaintext key");
     println!("  ✓ Create user API key (received plaintext key)");
 
     let fetched: UserApiKey = ctx
         .client
-        .get(&format!("/api/auth/keys/{}", key_id))
+        .get(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
     assert_eq!(fetched.id, key_id);
     println!("  ✓ Read user API key");
@@ -412,7 +402,7 @@ async fn test_user_api_key_crud(ctx: &TestContext) -> Result<(), String> {
     updated.base.name = "Updated User API Key".to_string();
     let updated: UserApiKey = ctx
         .client
-        .put(&format!("/api/auth/keys/{}", updated.id), &updated)
+        .put(&format!("/api/v1/auth/keys/{}", updated.id), &updated)
         .await?;
     assert_eq!(updated.base.name, "Updated User API Key");
     assert_eq!(
@@ -421,12 +411,12 @@ async fn test_user_api_key_crud(ctx: &TestContext) -> Result<(), String> {
     );
     println!("  ✓ Update user API key (key hash preserved)");
 
-    let keys: Vec<UserApiKey> = ctx.client.get("/api/auth/keys").await?;
+    let keys: Vec<UserApiKey> = ctx.client.get("/api/v1/auth/keys").await?;
     assert!(keys.iter().any(|k| k.id == key_id));
     println!("  ✓ List user API keys");
 
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
     println!("  ✓ Delete user API key");
 
@@ -451,23 +441,17 @@ async fn test_user_api_key_authentication(ctx: &TestContext) -> Result<(), Strin
         network_ids: vec![ctx.network_id],
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let plaintext_key = created["key"]
-        .as_str()
-        .expect("Should have plaintext key")
-        .to_string();
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let plaintext_key = created.key.clone();
+    let key_id = created.api_key.id;
     println!("  ✓ Created API key for authentication test");
 
     // Create a new HTTP client without cookies (to test API key auth separately)
     let api_key_client = reqwest::Client::new();
 
-    // Test: Access GET /api/subnets with Bearer token (should work - Viewer permission)
+    // Test: Access GET /api/v1/subnets with Bearer token (should work - Viewer permission)
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -475,12 +459,12 @@ async fn test_user_api_key_authentication(ctx: &TestContext) -> Result<(), Strin
 
     assert!(
         response.status().is_success(),
-        "API key should be able to access GET /api/subnets (Viewer endpoint), got {}",
+        "API key should be able to access GET /api/v1/subnets (Viewer endpoint), got {}",
         response.status()
     );
-    println!("  ✓ API key can access read endpoints (GET /api/subnets)");
+    println!("  ✓ API key can access read endpoints (GET /api/v1/subnets)");
 
-    // Test: Access POST /api/subnets with Bearer token (should fail - requires Member)
+    // Test: Access POST /api/v1/subnets with Bearer token (should fail - requires Member)
     let test_subnet = Subnet::new(SubnetBase {
         name: "API Key Test Subnet".to_string(),
         description: None,
@@ -492,7 +476,7 @@ async fn test_user_api_key_authentication(ctx: &TestContext) -> Result<(), Strin
     });
 
     let response = api_key_client
-        .post(format!("{}/api/subnets", BASE_URL))
+        .post(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .json(&test_subnet)
         .send()
@@ -505,11 +489,11 @@ async fn test_user_api_key_authentication(ctx: &TestContext) -> Result<(), Strin
         "Viewer API key should NOT be able to POST (requires Member), got {}",
         response.status()
     );
-    println!("  ✓ Viewer API key correctly denied write access (POST /api/subnets)");
+    println!("  ✓ Viewer API key correctly denied write access (POST /api/v1/subnets)");
 
     // Test: Unauthenticated request should fail
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .send()
         .await
         .map_err(|e| format!("Unauthenticated request failed: {}", e))?;
@@ -524,7 +508,7 @@ async fn test_user_api_key_authentication(ctx: &TestContext) -> Result<(), Strin
 
     // Cleanup
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
 
     println!("✅ User API Key Authentication passed");
@@ -556,7 +540,7 @@ async fn test_user_api_key_permission_escalation(ctx: &TestContext) -> Result<()
 
     let result = ctx
         .client
-        .post_expect_status("/api/auth/keys", &api_key, StatusCode::FORBIDDEN)
+        .post_expect_status("/api/v1/auth/keys", &api_key, StatusCode::FORBIDDEN)
         .await;
 
     // Restore Owner permissions
@@ -583,16 +567,13 @@ async fn test_user_api_key_permission_escalation(ctx: &TestContext) -> Result<()
         network_ids: vec![ctx.network_id],
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key_admin).await?;
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key_admin).await?;
+    let key_id = created.api_key.id;
     println!("  ✓ Owner can create Admin-level API key");
 
     // Cleanup
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
 
     println!("✅ User API Key Permission Escalation Prevention passed");
@@ -617,21 +598,15 @@ async fn test_user_api_key_rotation(ctx: &TestContext) -> Result<(), String> {
         network_ids: vec![ctx.network_id],
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let original_key = created["key"]
-        .as_str()
-        .expect("Should have plaintext key")
-        .to_string();
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let original_key = created.key.clone();
+    let key_id = created.api_key.id;
     println!("  ✓ Created API key for rotation test");
 
     // Rotate the key
     let rotated: String = ctx
         .client
-        .post(&format!("/api/auth/keys/{}/rotate", key_id), &())
+        .post(&format!("/api/v1/auth/keys/{}/rotate", key_id), &())
         .await?;
 
     assert_ne!(
@@ -647,7 +622,7 @@ async fn test_user_api_key_rotation(ctx: &TestContext) -> Result<(), String> {
     // Verify old key no longer works
     let api_key_client = reqwest::Client::new();
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", original_key))
         .send()
         .await
@@ -662,7 +637,7 @@ async fn test_user_api_key_rotation(ctx: &TestContext) -> Result<(), String> {
 
     // Verify new key works
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", rotated))
         .send()
         .await
@@ -677,7 +652,7 @@ async fn test_user_api_key_rotation(ctx: &TestContext) -> Result<(), String> {
 
     // Cleanup
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
 
     println!("✅ User API Key Rotation passed");
@@ -704,20 +679,14 @@ async fn test_user_api_key_expired_disabled(ctx: &TestContext) -> Result<(), Str
         network_ids: vec![ctx.network_id],
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let plaintext_key = created["key"]
-        .as_str()
-        .expect("Should have plaintext key")
-        .to_string();
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let plaintext_key = created.key.clone();
+    let key_id = created.api_key.id;
 
     // Verify key works initially
     let api_key_client = reqwest::Client::new();
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -731,17 +700,17 @@ async fn test_user_api_key_expired_disabled(ctx: &TestContext) -> Result<(), Str
     // Disable the key via update
     let mut fetched: UserApiKey = ctx
         .client
-        .get(&format!("/api/auth/keys/{}", key_id))
+        .get(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
     fetched.base.is_enabled = false;
     let _updated: UserApiKey = ctx
         .client
-        .put(&format!("/api/auth/keys/{}", key_id), &fetched)
+        .put(&format!("/api/v1/auth/keys/{}", key_id), &fetched)
         .await?;
 
     // Verify disabled key is rejected
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -758,12 +727,12 @@ async fn test_user_api_key_expired_disabled(ctx: &TestContext) -> Result<(), Str
     fetched.base.expires_at = Some(Utc::now() - Duration::hours(1));
     let _updated: UserApiKey = ctx
         .client
-        .put(&format!("/api/auth/keys/{}", key_id), &fetched)
+        .put(&format!("/api/v1/auth/keys/{}", key_id), &fetched)
         .await?;
 
     // Verify expired key is rejected
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -777,7 +746,7 @@ async fn test_user_api_key_expired_disabled(ctx: &TestContext) -> Result<(), Str
 
     // Cleanup
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
 
     println!("✅ Expired/Disabled API Key Rejection passed");
@@ -827,22 +796,16 @@ async fn test_user_api_key_network_access(ctx: &TestContext) -> Result<(), Strin
         network_ids: vec![ctx.network_id], // Only first network
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let plaintext_key = created["key"]
-        .as_str()
-        .expect("Should have plaintext key")
-        .to_string();
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let plaintext_key = created.key.clone();
+    let key_id = created.api_key.id;
     println!("  ✓ Created API key with limited network access");
 
     let api_key_client = reqwest::Client::new();
 
     // Verify key can access subnets on assigned network
     let response = api_key_client
-        .get(format!("{}/api/subnets", BASE_URL))
+        .get(format!("{}/api/v1/subnets", BASE_URL))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -855,7 +818,7 @@ async fn test_user_api_key_network_access(ctx: &TestContext) -> Result<(), Strin
 
     // Verify key cannot directly access the other network's subnet
     let response = api_key_client
-        .get(format!("{}/api/subnets/{}", BASE_URL, other_subnet.id))
+        .get(format!("{}/api/v1/subnets/{}", BASE_URL, other_subnet.id))
         .header("Authorization", format!("Bearer {}", plaintext_key))
         .send()
         .await
@@ -890,7 +853,7 @@ async fn test_user_api_key_network_access(ctx: &TestContext) -> Result<(), Strin
 
     let result = ctx
         .client
-        .post_expect_status("/api/auth/keys", &restricted_key, StatusCode::FORBIDDEN)
+        .post_expect_status("/api/v1/auth/keys", &restricted_key, StatusCode::FORBIDDEN)
         .await;
 
     // Restore Owner permissions
@@ -905,7 +868,7 @@ async fn test_user_api_key_network_access(ctx: &TestContext) -> Result<(), Strin
 
     // Cleanup
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
     let _ = ctx.delete_entity::<Subnet>(&other_subnet.id).await;
     let _ = ctx.delete_entity::<Network>(&other_network.id).await;
@@ -934,24 +897,20 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
         network_ids: vec![ctx.network_id],
     });
 
-    let created: serde_json::Value = ctx.client.post("/api/auth/keys", &api_key).await?;
-    let key_id = created["api_key"]["id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have key ID");
-    let user_id = created["api_key"]["base"]["user_id"]
-        .as_str()
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .expect("Should have user ID");
+    let created: UserApiKeyResponse = ctx.client.post("/api/v1/auth/keys", &api_key).await?;
+    let key_id = created.api_key.id;
+    let user_id = created.api_key.base.user_id;
     println!("  ✓ Created API key owned by user {}", user_id);
 
     // Create another user's API key directly in the database
     // (simulating another user who created a key)
-    let other_user_id = Uuid::new_v4();
+    let mut other_user = User::new(UserBase::default());
+    other_user.base.organization_id = ctx.organization_id;
+    let created_other_user = ctx.insert_entity(&other_user).await.unwrap();
     let other_key = UserApiKeyEntity::new(UserApiKeyBase {
         key: "other_user_hash".to_string(),
         name: "Other User Key".to_string(),
-        user_id: other_user_id,
+        user_id: created_other_user.id,
         organization_id: ctx.organization_id,
         permissions: UserOrgPermissions::Viewer,
         last_used: None,
@@ -961,13 +920,16 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
         network_ids: vec![ctx.network_id],
     });
     let other_key = ctx.insert_entity(&other_key).await?;
-    println!("  ✓ Created API key owned by other user {}", other_user_id);
+    println!(
+        "  ✓ Created API key owned by other user {}",
+        created_other_user.id
+    );
 
     // Verify current user cannot read the other user's key
     let result = ctx
         .client
         .get_expect_status(
-            &format!("/api/auth/keys/{}", other_key.id),
+            &format!("/api/v1/auth/keys/{}", other_key.id),
             StatusCode::NOT_FOUND,
         )
         .await;
@@ -979,7 +941,7 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
     println!("  ✓ Cannot read other user's API key (returns 404)");
 
     // Verify other user's key doesn't appear in the list
-    let keys: Vec<UserApiKey> = ctx.client.get("/api/auth/keys").await?;
+    let keys: Vec<UserApiKey> = ctx.client.get("/api/v1/auth/keys").await?;
     let other_key_in_list = keys.iter().any(|k| k.id == other_key.id);
     assert!(
         !other_key_in_list,
@@ -993,7 +955,7 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
     let _result = ctx
         .client
         .post_expect_status(
-            &format!("/api/auth/keys/{}", other_key.id),
+            &format!("/api/v1/auth/keys/{}", other_key.id),
             &attempt_update,
             StatusCode::NOT_FOUND,
         )
@@ -1007,7 +969,7 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
     let response = ctx
         .client
         .client
-        .delete(format!("{}/api/auth/keys/{}", BASE_URL, other_key.id))
+        .delete(format!("{}/api/v1/auth/keys/{}", BASE_URL, other_key.id))
         .send()
         .await
         .map_err(|e| format!("Delete request failed: {}", e))?;
@@ -1021,7 +983,7 @@ async fn test_user_api_key_owner_isolation(ctx: &TestContext) -> Result<(), Stri
 
     // Cleanup - delete both keys
     ctx.client
-        .delete_no_content(&format!("/api/auth/keys/{}", key_id))
+        .delete_no_content(&format!("/api/v1/auth/keys/{}", key_id))
         .await?;
     let _ = ctx.delete_entity::<UserApiKeyEntity>(&other_key.id).await;
 

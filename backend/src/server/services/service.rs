@@ -193,7 +193,6 @@ impl CrudService<Service> for ServiceService {
                         metadata: serde_json::json!({
                             "trigger_stale": trigger_stale
                         }),
-                        auth_method: authentication.auth_method(),
                         authentication,
                     })
                     .await?;
@@ -274,7 +273,6 @@ impl CrudService<Service> for ServiceService {
                 metadata: serde_json::json!({
                     "trigger_stale": trigger_stale
                 }),
-                auth_method: authentication.auth_method(),
                 authentication: authentication.clone(),
             })
             .await?;
@@ -310,7 +308,6 @@ impl CrudService<Service> for ServiceService {
                 metadata: serde_json::json!({
                     "trigger_stale": trigger_stale
                 }),
-                auth_method: authentication.auth_method(),
                 authentication,
             })
             .await?;
@@ -916,7 +913,6 @@ impl ServiceService {
                     metadata: serde_json::json!({
                         "trigger_stale": trigger_stale
                     }),
-                    auth_method: authentication.auth_method(),
                     authentication,
                 })
                 .await?;

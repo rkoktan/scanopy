@@ -247,14 +247,14 @@ function saveAutoRebuildToStorage(autoRebuild: boolean): void {
 
 export async function refreshTopology(data: Topology) {
 	// Updated topology returns through SSE
-	await apiClient.POST('/api/topology/{id}/refresh', {
+	await apiClient.POST('/api/v1/topology/{id}/refresh', {
 		params: { path: { id: data.id } },
 		body: data
 	});
 }
 
 export async function lockTopology(data: Topology) {
-	const { data: result } = await apiClient.POST('/api/topology/{id}/lock', {
+	const { data: result } = await apiClient.POST('/api/v1/topology/{id}/lock', {
 		params: { path: { id: data.id } },
 		body: data
 	});
@@ -270,7 +270,7 @@ export async function lockTopology(data: Topology) {
 }
 
 export async function unlockTopology(data: Topology) {
-	const { data: result } = await apiClient.POST('/api/topology/{id}/unlock', {
+	const { data: result } = await apiClient.POST('/api/v1/topology/{id}/unlock', {
 		params: { path: { id: data.id } },
 		body: data
 	});
@@ -286,7 +286,7 @@ export async function unlockTopology(data: Topology) {
 }
 
 export async function getTopologies() {
-	const { data } = await apiClient.GET('/api/topology');
+	const { data } = await apiClient.GET('/api/v1/topology');
 	if (data?.success && data.data) {
 		topologies.set(data.data);
 	}
@@ -294,7 +294,7 @@ export async function getTopologies() {
 
 export async function rebuildTopology(data: Topology) {
 	// Updated topology returns through SSE
-	await apiClient.POST('/api/topology/{id}/rebuild', {
+	await apiClient.POST('/api/v1/topology/{id}/rebuild', {
 		params: { path: { id: data.id } },
 		body: data
 	});
@@ -302,14 +302,14 @@ export async function rebuildTopology(data: Topology) {
 
 export async function updateTopology(data: Topology) {
 	// Updated topology returns through SSE
-	await apiClient.PUT('/api/topology/{id}', {
+	await apiClient.PUT('/api/v1/topology/{id}', {
 		params: { path: { id: data.id } },
 		body: data
 	});
 }
 
 export async function createTopology(data: Topology) {
-	const { data: result } = await apiClient.POST('/api/topology', { body: data });
+	const { data: result } = await apiClient.POST('/api/v1/topology', { body: data });
 
 	if (result?.success && result.data) {
 		topologies.update((current) => [...current, result.data!]);
@@ -320,7 +320,7 @@ export async function createTopology(data: Topology) {
 }
 
 export async function deleteTopology(id: string) {
-	const { data: result } = await apiClient.DELETE('/api/topology/{id}', {
+	const { data: result } = await apiClient.DELETE('/api/v1/topology/{id}', {
 		params: { path: { id } }
 	});
 

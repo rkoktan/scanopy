@@ -341,7 +341,6 @@ async fn rebuild(
                     metadata: serde_json::json!({
                         "is_onboarding_step": true
                     }),
-                    auth_method: entity.auth_method(),
                     authentication: entity,
                 })
                 .await?;

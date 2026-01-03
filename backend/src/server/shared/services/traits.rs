@@ -29,6 +29,17 @@ pub trait EventBusService<T: Into<Entity> + Default> {
 
     fn get_network_id(&self, entity: &T) -> Option<Uuid>;
     fn get_organization_id(&self, entity: &T) -> Option<Uuid>;
+
+    /// Whether to suppress activity logs for this operation.
+    /// Returns true if only non-significant fields changed (e.g., last_seen timestamps).
+    /// - Create: current is None, updated is Some
+    /// - Update: both are Some
+    /// - Delete: current is Some, updated is None
+    ///
+    /// Default implementation returns false (don't suppress).
+    fn suppress_logs(&self, _current: Option<&T>, _updated: Option<&T>) -> bool {
+        false
+    }
 }
 
 /// Helper trait for services that use generic storage
@@ -66,6 +77,7 @@ where
             self.storage().delete(id).await?;
 
             let trigger_stale = entity.triggers_staleness(None);
+            let suppress_logs = self.suppress_logs(Some(&entity), None);
 
             self.event_bus()
                 .publish_entity(EntityEvent {
@@ -77,9 +89,9 @@ where
                     operation: EntityOperation::Deleted,
                     timestamp: Utc::now(),
                     metadata: serde_json::json!({
-                        "trigger_stale": trigger_stale
+                        "trigger_stale": trigger_stale,
+                        "suppress_logs": suppress_logs
                     }),
-                    auth_method: authentication.auth_method(),
                     authentication,
                 })
                 .await?;
@@ -108,10 +120,7 @@ where
 
         let created = self.storage().create(&entity).await?;
         let trigger_stale = created.triggers_staleness(None);
-
-        let metadata = serde_json::json!({
-            "trigger_stale": trigger_stale
-        });
+        let suppress_logs = self.suppress_logs(None, Some(&created));
 
         self.event_bus()
             .publish_entity(EntityEvent {
@@ -122,8 +131,10 @@ where
                 entity_type: created.clone().into(),
                 operation: EntityOperation::Created,
                 timestamp: Utc::now(),
-                metadata,
-                auth_method: authentication.auth_method(),
+                metadata: serde_json::json!({
+                    "trigger_stale": trigger_stale,
+                    "suppress_logs": suppress_logs
+                }),
                 authentication,
             })
             .await?;
@@ -143,7 +154,8 @@ where
             .ok_or_else(|| anyhow!("Could not find {}", entity))?;
         let updated = self.storage().update(entity).await?;
 
-        let trigger_stale = updated.triggers_staleness(Some(current));
+        let trigger_stale = updated.triggers_staleness(Some(current.clone()));
+        let suppress_logs = self.suppress_logs(Some(&current), Some(&updated));
 
         self.event_bus()
             .publish_entity(EntityEvent {
@@ -155,9 +167,9 @@ where
                 operation: EntityOperation::Updated,
                 timestamp: Utc::now(),
                 metadata: serde_json::json!({
-                    "trigger_stale": trigger_stale
+                    "trigger_stale": trigger_stale,
+                    "suppress_logs": suppress_logs
                 }),
-                auth_method: authentication.auth_method(),
                 authentication,
             })
             .await?;
@@ -178,6 +190,7 @@ where
         for id in ids {
             if let Some(entity) = self.get_by_id(id).await? {
                 let trigger_stale = entity.triggers_staleness(None);
+                let suppress_logs = self.suppress_logs(Some(&entity), None);
 
                 self.event_bus()
                     .publish_entity(EntityEvent {
@@ -189,9 +202,9 @@ where
                         operation: EntityOperation::Deleted,
                         timestamp: Utc::now(),
                         metadata: serde_json::json!({
-                            "trigger_stale": trigger_stale
+                            "trigger_stale": trigger_stale,
+                            "suppress_logs": suppress_logs
                         }),
-                        auth_method: authentication.auth_method(),
                         authentication: authentication.clone(),
                     })
                     .await?;
@@ -222,6 +235,7 @@ where
         // Publish delete events
         for entity in &entities {
             let trigger_stale = entity.triggers_staleness(None);
+            let suppress_logs = self.suppress_logs(Some(entity), None);
 
             self.event_bus()
                 .publish_entity(EntityEvent {
@@ -233,9 +247,9 @@ where
                     operation: EntityOperation::Deleted,
                     timestamp: Utc::now(),
                     metadata: serde_json::json!({
-                        "trigger_stale": trigger_stale
+                        "trigger_stale": trigger_stale,
+                        "suppress_logs": suppress_logs
                     }),
-                    auth_method: authentication.auth_method(),
                     authentication: authentication.clone(),
                 })
                 .await?;
@@ -358,6 +372,7 @@ where
 
         for entity in entities {
             let trigger_stale = entity.triggers_staleness(None);
+            let suppress_logs = self.suppress_logs(Some(&entity), None);
             self.event_bus()
                 .publish_entity(EntityEvent {
                     id: Uuid::new_v4(),
@@ -368,9 +383,9 @@ where
                     operation: EntityOperation::Deleted,
                     timestamp: Utc::now(),
                     metadata: serde_json::json!({
-                        "trigger_stale": trigger_stale
+                        "trigger_stale": trigger_stale,
+                        "suppress_logs": suppress_logs
                     }),
-                    auth_method: authentication.auth_method(),
                     authentication: authentication.clone(),
                 })
                 .await?;

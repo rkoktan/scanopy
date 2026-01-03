@@ -2,18 +2,14 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Scanopy API",
-    "description": "Network topology discovery and visualization API",
+    "description": "Network topology discovery and visualization API. API version 1.",
     "license": {
       "name": "Dual (AGPL3.0, Commercial License Available)"
     },
-<<<<<<< HEAD
-    "version": "0.12.10"
-=======
-    "version": "0.12.7"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+    "version": "1"
   },
   "paths": {
-    "/api/auth/daemon": {
+    "/api/v1/auth/daemon": {
       "get": {
         "tags": [
           "daemon_api_keys"
@@ -50,6 +46,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -114,11 +113,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/auth/daemon/bulk-delete": {
+    "/api/v1/auth/daemon/bulk-delete": {
       "post": {
         "tags": [
           "daemon_api_keys"
@@ -155,11 +157,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/auth/daemon/{id}": {
+    "/api/v1/auth/daemon/{id}": {
       "get": {
         "tags": [
           "daemon_api_keys"
@@ -203,6 +208,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -259,6 +267,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -305,11 +316,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/auth/daemon/{id}/rotate": {
+    "/api/v1/auth/daemon/{id}/rotate": {
       "post": {
         "tags": [
           "daemon_api_keys"
@@ -353,11 +367,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/auth/keys": {
+    "/api/v1/auth/keys": {
       "get": {
         "tags": [
           "user_api_keys"
@@ -467,15 +484,15 @@
         ]
       }
     },
-    "/api/auth/keys/bulk-delete": {
+    "/api/v1/auth/keys/bulk-delete": {
       "post": {
         "tags": [
           "user_api_keys"
         ],
-        "summary": "Bulk delete user_api_keys",
+        "summary": "Bulk delete user API keys",
         "operationId": "bulk_delete_user_api_keys",
         "requestBody": {
-          "description": "Array of user_api_keys IDs to delete",
+          "description": "Array of API key IDs to delete",
           "content": {
             "application/json": {
               "schema": {
@@ -491,7 +508,7 @@
         },
         "responses": {
           "200": {
-            "description": "UserApiKeys deleted",
+            "description": "API keys deleted",
             "content": {
               "application/json": {
                 "schema": {
@@ -508,18 +525,18 @@
         ]
       }
     },
-    "/api/auth/keys/{id}": {
+    "/api/v1/auth/keys/{id}": {
       "get": {
         "tags": [
           "user_api_keys"
         ],
-        "summary": "Get user_api_key by ID",
+        "summary": "Get a user API key by ID",
         "operationId": "get_user_api_key_by_id",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "UserApiKey ID",
+            "description": "API key ID",
             "required": true,
             "schema": {
               "type": "string",
@@ -529,7 +546,7 @@
         ],
         "responses": {
           "200": {
-            "description": "UserApiKey found",
+            "description": "API key found",
             "content": {
               "application/json": {
                 "schema": {
@@ -539,7 +556,7 @@
             }
           },
           "404": {
-            "description": "UserApiKey not found",
+            "description": "API key not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -625,13 +642,13 @@
         "tags": [
           "user_api_keys"
         ],
-        "summary": "Delete user_api_key",
+        "summary": "Delete a user API key",
         "operationId": "delete_user_api_key",
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "description": "UserApiKey ID",
+            "description": "API key ID",
             "required": true,
             "schema": {
               "type": "string",
@@ -641,7 +658,7 @@
         ],
         "responses": {
           "200": {
-            "description": "UserApiKey deleted",
+            "description": "API key deleted",
             "content": {
               "application/json": {
                 "schema": {
@@ -651,7 +668,7 @@
             }
           },
           "404": {
-            "description": "UserApiKey not found",
+            "description": "API key not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -668,7 +685,7 @@
         ]
       }
     },
-    "/api/auth/keys/{id}/rotate": {
+    "/api/v1/auth/keys/{id}/rotate": {
       "post": {
         "tags": [
           "user_api_keys"
@@ -726,7 +743,7 @@
         ]
       }
     },
-    "/api/bindings": {
+    "/api/v1/bindings": {
       "get": {
         "tags": [
           "bindings"
@@ -802,6 +819,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -857,11 +877,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/bindings/bulk-delete": {
+    "/api/v1/bindings/bulk-delete": {
       "post": {
         "tags": [
           "bindings"
@@ -898,11 +921,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/bindings/{id}": {
+    "/api/v1/bindings/{id}": {
       "get": {
         "tags": [
           "bindings"
@@ -946,6 +972,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1013,6 +1042,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1059,11 +1091,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/daemons": {
+    "/api/v1/daemons": {
       "get": {
         "tags": [
           "daemons"
@@ -1086,11 +1121,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/daemons/bulk-delete": {
+    "/api/v1/daemons/bulk-delete": {
       "post": {
         "tags": [
           "daemons"
@@ -1127,11 +1165,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/daemons/{id}": {
+    "/api/v1/daemons/{id}": {
       "get": {
         "tags": [
           "daemons"
@@ -1186,6 +1227,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1232,11 +1276,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery": {
+    "/api/v1/discovery": {
       "get": {
         "tags": [
           "discoveries"
@@ -1286,6 +1333,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1330,11 +1380,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery/active-sessions": {
+    "/api/v1/discovery/active-sessions": {
       "get": {
         "tags": [
           "discoveries"
@@ -1356,11 +1409,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery/bulk-delete": {
+    "/api/v1/discovery/bulk-delete": {
       "post": {
         "tags": [
           "discoveries"
@@ -1397,11 +1453,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery/start-session": {
+    "/api/v1/discovery/start-session": {
       "post": {
         "tags": [
           "discoveries"
@@ -1444,11 +1503,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery/{id}": {
+    "/api/v1/discovery/{id}": {
       "get": {
         "tags": [
           "discoveries"
@@ -1492,6 +1554,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1548,6 +1613,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1594,11 +1662,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/discovery/{session_id}/cancel": {
+    "/api/v1/discovery/{session_id}/cancel": {
       "post": {
         "tags": [
           "discoveries"
@@ -1632,11 +1703,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/groups": {
+    "/api/v1/groups": {
       "get": {
         "tags": [
           "groups"
@@ -1673,6 +1747,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1717,11 +1794,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/groups/bulk-delete": {
+    "/api/v1/groups/bulk-delete": {
       "post": {
         "tags": [
           "groups"
@@ -1758,11 +1838,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/groups/{id}": {
+    "/api/v1/groups/{id}": {
       "get": {
         "tags": [
           "groups"
@@ -1806,6 +1889,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1872,6 +1958,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -1918,11 +2007,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/hosts": {
+    "/api/v1/hosts": {
       "get": {
         "tags": [
           "hosts"
@@ -1945,6 +2037,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2000,11 +2095,17 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
+          },
+          {
+            "daemon_api_key": []
           }
         ]
       }
     },
-    "/api/hosts/bulk-delete": {
+    "/api/v1/hosts/bulk-delete": {
       "post": {
         "tags": [
           "hosts"
@@ -2052,11 +2153,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/hosts/{destination_host}/consolidate/{other_host}": {
+    "/api/v1/hosts/{destination_host}/consolidate/{other_host}": {
       "put": {
         "tags": [
           "hosts"
@@ -2121,11 +2225,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/hosts/{id}": {
+    "/api/v1/hosts/{id}": {
       "get": {
         "tags": [
           "hosts"
@@ -2170,6 +2277,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2237,6 +2347,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2294,11 +2407,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/interfaces": {
+    "/api/v1/interfaces": {
       "get": {
         "tags": [
           "interfaces"
@@ -2361,6 +2477,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2405,11 +2524,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/interfaces/bulk-delete": {
+    "/api/v1/interfaces/bulk-delete": {
       "post": {
         "tags": [
           "interfaces"
@@ -2455,11 +2577,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/interfaces/{id}": {
+    "/api/v1/interfaces/{id}": {
       "get": {
         "tags": [
           "interfaces"
@@ -2503,6 +2628,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2569,6 +2697,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2615,11 +2746,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/invites": {
+    "/api/v1/invites": {
       "get": {
         "tags": [
           "invites"
@@ -2641,6 +2775,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2685,11 +2822,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/invites/{id}": {
+    "/api/v1/invites/{id}": {
       "get": {
         "tags": [
           "invites"
@@ -2743,11 +2883,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/invites/{id}/revoke": {
+    "/api/v1/invites/{id}/revoke": {
       "delete": {
         "tags": [
           "invites"
@@ -2801,11 +2944,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/networks": {
+    "/api/v1/networks": {
       "get": {
         "tags": [
           "networks"
@@ -2828,6 +2974,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -2862,11 +3011,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/networks/bulk-delete": {
+    "/api/v1/networks/bulk-delete": {
       "post": {
         "tags": [
           "networks"
@@ -2913,11 +3065,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/networks/{id}": {
+    "/api/v1/networks/{id}": {
       "get": {
         "tags": [
           "networks"
@@ -2961,6 +3116,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3027,6 +3185,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3083,11 +3244,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/organizations": {
+    "/api/v1/organizations": {
       "get": {
         "tags": [
           "organizations"
@@ -3123,7 +3287,7 @@
         ]
       }
     },
-    "/api/organizations/{id}": {
+    "/api/v1/organizations/{id}": {
       "put": {
         "tags": [
           "organizations"
@@ -3187,11 +3351,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/ports": {
+    "/api/v1/ports": {
       "get": {
         "tags": [
           "ports"
@@ -3241,6 +3408,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3285,11 +3455,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/ports/bulk-delete": {
+    "/api/v1/ports/bulk-delete": {
       "post": {
         "tags": [
           "ports"
@@ -3326,11 +3499,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/ports/{id}": {
+    "/api/v1/ports/{id}": {
       "get": {
         "tags": [
           "ports"
@@ -3374,6 +3550,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3440,6 +3619,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3486,11 +3668,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/services": {
+    "/api/v1/services": {
       "get": {
         "tags": [
           "services"
@@ -3540,6 +3725,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3585,11 +3773,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/services/bulk-delete": {
+    "/api/v1/services/bulk-delete": {
       "post": {
         "tags": [
           "services"
@@ -3626,11 +3817,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/services/{id}": {
+    "/api/v1/services/{id}": {
       "get": {
         "tags": [
           "services"
@@ -3674,6 +3868,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3741,6 +3938,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3787,11 +3987,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/shares": {
+    "/api/v1/shares": {
       "get": {
         "tags": [
           "shares"
@@ -3841,6 +4044,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -3885,11 +4091,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/shares/bulk-delete": {
+    "/api/v1/shares/bulk-delete": {
       "post": {
         "tags": [
           "shares"
@@ -3926,11 +4135,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/shares/public/{id}": {
+    "/api/v1/shares/public/{id}": {
       "get": {
         "tags": [
           "shares"
@@ -3974,7 +4186,7 @@
         }
       }
     },
-    "/api/shares/{id}": {
+    "/api/v1/shares/{id}": {
       "get": {
         "tags": [
           "shares"
@@ -4018,6 +4230,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4074,6 +4289,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4120,11 +4338,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/subnets": {
+    "/api/v1/subnets": {
       "get": {
         "tags": [
           "subnets"
@@ -4162,6 +4383,12 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
+          },
+          {
+            "daemon_api_key": []
           }
         ]
       },
@@ -4206,11 +4433,17 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
+          },
+          {
+            "daemon_api_key": []
           }
         ]
       }
     },
-    "/api/subnets/bulk-delete": {
+    "/api/v1/subnets/bulk-delete": {
       "post": {
         "tags": [
           "subnets"
@@ -4247,11 +4480,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/subnets/{id}": {
+    "/api/v1/subnets/{id}": {
       "get": {
         "tags": [
           "subnets"
@@ -4295,6 +4531,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4362,6 +4601,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4408,11 +4650,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/tags": {
+    "/api/v1/tags": {
       "get": {
         "tags": [
           "tags"
@@ -4435,6 +4680,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4490,11 +4738,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/tags/bulk-delete": {
+    "/api/v1/tags/bulk-delete": {
       "post": {
         "tags": [
           "tags"
@@ -4531,11 +4782,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/tags/{id}": {
+    "/api/v1/tags/{id}": {
       "get": {
         "tags": [
           "tags"
@@ -4579,6 +4833,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4635,6 +4892,9 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       },
@@ -4681,11 +4941,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/topology/{id}/lock": {
+    "/api/v1/topology/{id}/lock": {
       "post": {
         "tags": [
           "topology"
@@ -4749,11 +5012,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/topology/{id}/unlock": {
+    "/api/v1/topology/{id}/unlock": {
       "post": {
         "tags": [
           "topology"
@@ -4817,11 +5083,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/users": {
+    "/api/v1/users": {
       "get": {
         "tags": [
           "users"
@@ -4843,11 +5112,14 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
       }
     },
-    "/api/users/bulk-delete": {
+    "/api/v1/users/bulk-delete": {
       "post": {
         "tags": [
           "users"
@@ -4894,8 +5166,32 @@
         "security": [
           {
             "session": []
+          },
+          {
+            "user_api_key": []
           }
         ]
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Get API version information",
+        "operationId": "get_version",
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_VersionInfo"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -4919,10 +5215,32 @@
           }
         }
       },
+      "ApiMeta": {
+        "type": "object",
+        "description": "API version metadata included in all responses",
+        "required": [
+          "api_version",
+          "server_version"
+        ],
+        "properties": {
+          "api_version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "API version (integer, increments on breaking changes)",
+            "minimum": 0
+          },
+          "server_version": {
+            "type": "string",
+            "description": "Server version (semver)",
+            "example": "0.12.10"
+          }
+        }
+      },
       "ApiResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -4941,6 +5259,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -4949,7 +5270,8 @@
       "ApiResponse_Binding": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -4985,23 +5307,14 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-<<<<<<< HEAD
-              "created_at": "2026-01-02T00:24:06.536065Z",
-              "id": "d77fa89e-206d-4b21-8735-f54887e2bc52",
-=======
-              "created_at": "2025-12-29T01:51:50.906905Z",
-              "id": "a2dfa447-3322-4b7e-8675-1b2770e709c9",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+              "created_at": "2026-01-03T05:01:26.572551Z",
+              "id": "925d3d40-98f8-49d1-b054-59696febfcc5",
               "interface_id": "550e8400-e29b-41d4-a716-446655440005",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-<<<<<<< HEAD
-              "updated_at": "2026-01-02T00:24:06.536065Z"
-=======
-              "updated_at": "2025-12-29T01:51:50.906905Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+              "updated_at": "2026-01-03T05:01:26.572551Z"
             }
           },
           "error": {
@@ -5009,6 +5322,9 @@
               "string",
               "null"
             ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
@@ -5018,7 +5334,8 @@
       "ApiResponse_BulkDeleteResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5044,6 +5361,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5052,7 +5372,8 @@
       "ApiResponse_DaemonApiKey": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5093,67 +5414,19 @@
               "null"
             ]
           },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-<<<<<<< HEAD
-=======
-      "ApiResponse_DaemonApiKey": {
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "properties": {
-          "data": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DaemonApiKeyBase"
-              },
-              {
-                "type": "object",
-                "required": [
-                  "id",
-                  "updated_at",
-                  "created_at"
-                ],
-                "properties": {
-                  "created_at": {
-                    "type": "string",
-                    "format": "date-time",
-                    "readOnly": true
-                  },
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "readOnly": true
-                  },
-                  "updated_at": {
-                    "type": "string",
-                    "format": "date-time",
-                    "readOnly": true
-                  }
-                }
-              }
-            ]
-          },
-          "error": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
           }
         }
       },
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
       "ApiResponse_DaemonApiKeyResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5177,50 +5450,8 @@
               "null"
             ]
           },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponse_DaemonRegistrationResponse": {
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "properties": {
-          "data": {
-            "type": "object",
-            "description": "Daemon registration response from server to daemon",
-            "required": [
-              "daemon",
-              "host_id"
-            ],
-            "properties": {
-              "daemon": {
-                "$ref": "#/components/schemas/Daemon"
-              },
-              "host_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "server_capabilities": {
-                "oneOf": [
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ServerCapabilities",
-                    "description": "Server capabilities (returned if daemon sends version info)"
-                  }
-                ]
-              }
-            }
-          },
-          "error": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
@@ -5230,7 +5461,8 @@
       "ApiResponse_DaemonResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5274,6 +5506,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5282,7 +5517,8 @@
       "ApiResponse_DaemonSetupResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5303,6 +5539,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5311,7 +5550,8 @@
       "ApiResponse_Discovery": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5352,6 +5592,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5360,7 +5603,8 @@
       "ApiResponse_DiscoveryUpdatePayload": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5426,6 +5670,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5434,7 +5681,8 @@
       "ApiResponse_Group": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5491,6 +5739,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5499,7 +5750,8 @@
       "ApiResponse_HostResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5641,6 +5893,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5649,7 +5904,8 @@
       "ApiResponse_Interface": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5702,6 +5958,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5710,7 +5969,8 @@
       "ApiResponse_Invite": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5751,6 +6011,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5759,7 +6022,8 @@
       "ApiResponse_MetadataRegistry": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5852,6 +6116,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5860,7 +6127,8 @@
       "ApiResponse_Network": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5909,6 +6177,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5917,7 +6188,8 @@
       "ApiResponse_Organization": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -5958,6 +6230,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -5966,7 +6241,8 @@
       "ApiResponse_Port": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6018,6 +6294,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6026,7 +6305,8 @@
       "ApiResponse_PublicConfigResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6099,6 +6379,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6107,7 +6390,8 @@
       "ApiResponse_PublicShareMetadata": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6141,47 +6425,8 @@
               "null"
             ]
           },
-          "success": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponse_ServerCapabilities": {
-        "type": "object",
-        "required": [
-          "success"
-        ],
-        "properties": {
-          "data": {
-            "type": "object",
-            "description": "Server capabilities returned on startup/registration",
-            "required": [
-              "server_version",
-              "minimum_daemon_version"
-            ],
-            "properties": {
-              "deprecation_warnings": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/DeprecationWarning"
-                },
-                "description": "Deprecation warnings for the daemon"
-              },
-              "minimum_daemon_version": {
-                "type": "string",
-                "description": "Minimum daemon version supported by this server"
-              },
-              "server_version": {
-                "type": "string",
-                "description": "Server software version"
-              }
-            }
-          },
-          "error": {
-            "type": [
-              "string",
-              "null"
-            ]
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
@@ -6191,7 +6436,8 @@
       "ApiResponse_Service": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6228,23 +6474,14 @@
             "example": {
               "bindings": [
                 {
-<<<<<<< HEAD
-                  "created_at": "2026-01-02T00:24:06.533165Z",
-                  "id": "68175946-af63-4bbe-82b8-4e1b89a27a81",
-=======
-                  "created_at": "2025-12-29T01:51:50.902978Z",
-                  "id": "71fbbd87-5663-4c36-81f4-a0b924cfe252",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                  "created_at": "2026-01-03T05:01:26.570407Z",
+                  "id": "fb23fbf3-a0d6-4735-b847-5011b7f47470",
                   "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-<<<<<<< HEAD
-                  "updated_at": "2026-01-02T00:24:06.533165Z"
-=======
-                  "updated_at": "2025-12-29T01:51:50.902978Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                  "updated_at": "2026-01-03T05:01:26.570407Z"
                 }
               ],
               "created_at": "2026-01-15T10:30:00Z",
@@ -6252,11 +6489,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
-<<<<<<< HEAD
-              "service_definition": "Wazuh",
-=======
-              "service_definition": "MeTube",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+              "service_definition": "UptimeKuma",
               "source": {
                 "type": "Manual"
               },
@@ -6271,6 +6504,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6279,7 +6515,8 @@
       "ApiResponse_SetupResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6304,6 +6541,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6312,7 +6552,8 @@
       "ApiResponse_Share": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6353,6 +6594,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6361,7 +6605,8 @@
       "ApiResponse_String": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6373,6 +6618,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6381,7 +6629,8 @@
       "ApiResponse_Subnet": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6436,6 +6685,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6444,7 +6696,8 @@
       "ApiResponse_Tag": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6494,6 +6747,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6502,7 +6758,8 @@
       "ApiResponse_Topology": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6543,6 +6800,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6551,7 +6811,8 @@
       "ApiResponse_User": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6592,6 +6853,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6600,7 +6864,8 @@
       "ApiResponse_UserApiKey": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6641,6 +6906,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6649,7 +6917,8 @@
       "ApiResponse_UserApiKeyResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6675,6 +6944,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6683,7 +6955,8 @@
       "ApiResponse_Vec_BillingPlan": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6867,6 +7140,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6875,7 +7151,8 @@
       "ApiResponse_Vec_Binding": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6913,23 +7190,14 @@
               ],
               "description": "Association between a service and a port / interface that the service is listening on",
               "example": {
-<<<<<<< HEAD
-                "created_at": "2026-01-02T00:24:06.535819Z",
-                "id": "0be8fe04-89ec-4aea-959f-f997e0fe8799",
-=======
-                "created_at": "2025-12-29T01:51:50.906571Z",
-                "id": "73b3082d-9a04-4f12-8149-061385cdce8c",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                "created_at": "2026-01-03T05:01:26.572355Z",
+                "id": "1fa9e905-0dee-448b-93a5-0ab033799c61",
                 "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "port_id": "550e8400-e29b-41d4-a716-446655440006",
                 "service_id": "550e8400-e29b-41d4-a716-446655440007",
                 "type": "Port",
-<<<<<<< HEAD
-                "updated_at": "2026-01-02T00:24:06.535819Z"
-=======
-                "updated_at": "2025-12-29T01:51:50.906571Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                "updated_at": "2026-01-03T05:01:26.572355Z"
               }
             }
           },
@@ -6939,6 +7207,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -6947,7 +7218,8 @@
       "ApiResponse_Vec_DaemonApiKey": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -6991,19 +7263,19 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
         }
       },
-<<<<<<< HEAD
       "ApiResponse_Vec_DaemonResponse": {
-=======
-      "ApiResponse_Vec_DaemonApiKey": {
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7011,29 +7283,19 @@
             "items": {
               "allOf": [
                 {
-<<<<<<< HEAD
                   "$ref": "#/components/schemas/DaemonBase"
-=======
-                  "$ref": "#/components/schemas/DaemonApiKeyBase"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
                 },
                 {
                   "type": "object",
                   "required": [
                     "id",
-<<<<<<< HEAD
                     "created_at",
                     "updated_at",
                     "version_status"
-=======
-                    "updated_at",
-                    "created_at"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
                   ],
                   "properties": {
                     "created_at": {
                       "type": "string",
-<<<<<<< HEAD
                       "format": "date-time"
                     },
                     "id": {
@@ -7052,24 +7314,6 @@
                 }
               ],
               "description": "Daemon response for UI including computed version status"
-=======
-                      "format": "date-time",
-                      "readOnly": true
-                    },
-                    "id": {
-                      "type": "string",
-                      "format": "uuid",
-                      "readOnly": true
-                    },
-                    "updated_at": {
-                      "type": "string",
-                      "format": "date-time",
-                      "readOnly": true
-                    }
-                  }
-                }
-              ]
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
             }
           },
           "error": {
@@ -7077,6 +7321,9 @@
               "string",
               "null"
             ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
@@ -7086,7 +7333,8 @@
       "ApiResponse_Vec_Discovery": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7130,6 +7378,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7138,7 +7389,8 @@
       "ApiResponse_Vec_DiscoveryUpdatePayload": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7207,6 +7459,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7215,7 +7470,8 @@
       "ApiResponse_Vec_Group": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7275,6 +7531,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7283,7 +7542,8 @@
       "ApiResponse_Vec_HostResponse": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7428,6 +7688,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7436,7 +7699,8 @@
       "ApiResponse_Vec_Interface": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7492,6 +7756,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7500,7 +7767,8 @@
       "ApiResponse_Vec_Invite": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7544,6 +7812,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7552,7 +7823,8 @@
       "ApiResponse_Vec_Network": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7604,6 +7876,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7612,7 +7887,8 @@
       "ApiResponse_Vec_Port": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7667,6 +7943,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7675,7 +7954,8 @@
       "ApiResponse_Vec_Service": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7714,23 +7994,14 @@
               "example": {
                 "bindings": [
                   {
-<<<<<<< HEAD
-                    "created_at": "2026-01-02T00:24:06.532132Z",
-                    "id": "d905dd6c-8745-49c6-87f6-288b6c3c7f3b",
-=======
-                    "created_at": "2025-12-29T01:51:50.901658Z",
-                    "id": "48018eb5-889f-4072-bf12-d11ee56c3cf3",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                    "created_at": "2026-01-03T05:01:26.569754Z",
+                    "id": "4aa459e5-80aa-48d0-b458-d4fa33d7dd0a",
                     "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-<<<<<<< HEAD
-                    "updated_at": "2026-01-02T00:24:06.532132Z"
-=======
-                    "updated_at": "2025-12-29T01:51:50.901658Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                    "updated_at": "2026-01-03T05:01:26.569754Z"
                   }
                 ],
                 "created_at": "2026-01-15T10:30:00Z",
@@ -7738,11 +8009,7 @@
                 "id": "550e8400-e29b-41d4-a716-446655440007",
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
-<<<<<<< HEAD
-                "service_definition": "Wazuh",
-=======
-                "service_definition": "MeTube",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+                "service_definition": "UptimeKuma",
                 "source": {
                   "type": "Manual"
                 },
@@ -7758,6 +8025,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7766,7 +8036,8 @@
       "ApiResponse_Vec_Share": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7810,6 +8081,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7818,7 +8092,8 @@
       "ApiResponse_Vec_Subnet": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7876,6 +8151,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7884,7 +8162,8 @@
       "ApiResponse_Vec_Tag": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7937,6 +8216,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7945,7 +8227,8 @@
       "ApiResponse_Vec_Topology": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -7989,6 +8272,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -7997,7 +8283,8 @@
       "ApiResponse_Vec_User": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -8041,6 +8328,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -8049,7 +8339,8 @@
       "ApiResponse_Vec_UserApiKey": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -8093,6 +8384,58 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
+          "success": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponse_VersionInfo": {
+        "type": "object",
+        "required": [
+          "success",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Version information for API compatibility checking",
+            "required": [
+              "api_version",
+              "server_version"
+            ],
+            "properties": {
+              "api_version": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Current API version (integer, increments on breaking changes)",
+                "minimum": 0
+              },
+              "min_compatible_client": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Minimum client version that can use this API (optional, for future use)"
+              },
+              "server_version": {
+                "type": "string",
+                "description": "Server version (semver)",
+                "example": "0.12.10"
+              }
+            }
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -8101,7 +8444,8 @@
       "ApiResponse_bool": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -8113,6 +8457,9 @@
               "null"
             ]
           },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
+          },
           "success": {
             "type": "boolean"
           }
@@ -8121,7 +8468,8 @@
       "ApiResponse_u32": {
         "type": "object",
         "required": [
-          "success"
+          "success",
+          "meta"
         ],
         "properties": {
           "data": {
@@ -8134,6 +8482,9 @@
               "string",
               "null"
             ]
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ApiMeta"
           },
           "success": {
             "type": "boolean"
@@ -8352,23 +8703,14 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-<<<<<<< HEAD
-          "created_at": "2026-01-02T00:24:06.523143Z",
-          "id": "8b080046-143e-42ca-b100-c8fa79498f24",
-=======
-          "created_at": "2025-12-29T01:51:50.893461Z",
-          "id": "7d66d5c3-ad43-4180-8848-7050be89891c",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+          "created_at": "2026-01-03T05:01:26.566142Z",
+          "id": "94498645-8f3f-4867-884a-c1ef8a5ca85c",
           "interface_id": "550e8400-e29b-41d4-a716-446655440005",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-<<<<<<< HEAD
-          "updated_at": "2026-01-02T00:24:06.523143Z"
-=======
-          "updated_at": "2025-12-29T01:51:50.893461Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+          "updated_at": "2026-01-03T05:01:26.566142Z"
         }
       },
       "BindingBase": {
@@ -8796,38 +9138,6 @@
           }
         }
       },
-      "Daemon": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/DaemonBase"
-          },
-          {
-            "type": "object",
-            "required": [
-              "id",
-              "updated_at",
-              "created_at"
-            ],
-            "properties": {
-              "created_at": {
-                "type": "string",
-                "format": "date-time",
-                "readOnly": true
-              },
-              "id": {
-                "type": "string",
-                "format": "uuid",
-                "readOnly": true
-              },
-              "updated_at": {
-                "type": "string",
-                "format": "date-time",
-                "readOnly": true
-              }
-            }
-          }
-        ]
-      },
       "DaemonApiKey": {
         "allOf": [
           {
@@ -9003,105 +9313,12 @@
           }
         }
       },
-      "DaemonHeartbeatPayload": {
-        "type": "object",
-        "required": [
-          "url",
-          "name",
-          "mode"
-        ],
-        "properties": {
-          "mode": {
-            "$ref": "#/components/schemas/DaemonMode"
-          },
-          "name": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          }
-        }
-      },
       "DaemonMode": {
         "type": "string",
         "enum": [
           "Push",
           "Pull"
         ]
-      },
-      "DaemonRegistrationRequest": {
-        "type": "object",
-        "description": "Daemon registration request from daemon to server",
-        "required": [
-          "daemon_id",
-          "network_id",
-          "name",
-          "url",
-          "mode",
-          "capabilities"
-        ],
-        "properties": {
-          "capabilities": {
-            "$ref": "#/components/schemas/DaemonCapabilities"
-          },
-          "daemon_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "mode": {
-            "$ref": "#/components/schemas/DaemonMode"
-          },
-          "name": {
-            "type": "string"
-          },
-          "network_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "url": {
-            "type": "string"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "User responsible for maintaining this daemon (from frontend install command)\nOptional for backwards compat with old daemons - defaults to nil UUID"
-          },
-          "version": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Daemon software version (optional for backwards compat with old daemons)"
-          }
-        }
-      },
-      "DaemonRegistrationResponse": {
-        "type": "object",
-        "description": "Daemon registration response from server to daemon",
-        "required": [
-          "daemon",
-          "host_id"
-        ],
-        "properties": {
-          "daemon": {
-            "$ref": "#/components/schemas/Daemon"
-          },
-          "host_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "server_capabilities": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ServerCapabilities",
-                "description": "Server capabilities (returned if daemon sends version info)"
-              }
-            ]
-          }
-        }
       },
       "DaemonResponse": {
         "allOf": [
@@ -9167,19 +9384,6 @@
               "string",
               "null"
             ]
-          }
-        }
-      },
-      "DaemonStartupRequest": {
-        "type": "object",
-        "description": "Sent by daemon on startup to report version",
-        "required": [
-          "daemon_version"
-        ],
-        "properties": {
-          "daemon_version": {
-            "type": "string",
-            "description": "Daemon software version (semver format)"
           }
         }
       },
@@ -11238,31 +11442,6 @@
           }
         ]
       },
-      "ServerCapabilities": {
-        "type": "object",
-        "description": "Server capabilities returned on startup/registration",
-        "required": [
-          "server_version",
-          "minimum_daemon_version"
-        ],
-        "properties": {
-          "deprecation_warnings": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DeprecationWarning"
-            },
-            "description": "Deprecation warnings for the daemon"
-          },
-          "minimum_daemon_version": {
-            "type": "string",
-            "description": "Minimum daemon version supported by this server"
-          },
-          "server_version": {
-            "type": "string",
-            "description": "Server software version"
-          }
-        }
-      },
       "Service": {
         "allOf": [
           {
@@ -11297,23 +11476,14 @@
         "example": {
           "bindings": [
             {
-<<<<<<< HEAD
-              "created_at": "2026-01-02T00:24:06.523034Z",
-              "id": "802e3245-07cb-4b7d-8bc2-0b7cf28212db",
-=======
-              "created_at": "2025-12-29T01:51:50.893367Z",
-              "id": "9d4e3085-f7f3-47a0-81eb-992808c8631b",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+              "created_at": "2026-01-03T05:01:26.566092Z",
+              "id": "cd1dd962-5432-4fce-ab3c-39bea9547f8b",
               "interface_id": "550e8400-e29b-41d4-a716-446655440005",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-<<<<<<< HEAD
-              "updated_at": "2026-01-02T00:24:06.523034Z"
-=======
-              "updated_at": "2025-12-29T01:51:50.893367Z"
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+              "updated_at": "2026-01-03T05:01:26.566092Z"
             }
           ],
           "created_at": "2026-01-15T10:30:00Z",
@@ -11321,11 +11491,7 @@
           "id": "550e8400-e29b-41d4-a716-446655440007",
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
-<<<<<<< HEAD
-          "service_definition": "Wazuh",
-=======
-          "service_definition": "MeTube",
->>>>>>> 21f94925a1c4346b9ad37657908cff25b7b64424
+          "service_definition": "UptimeKuma",
           "source": {
             "type": "Manual"
           },
@@ -12522,19 +12688,54 @@
           "Outdated",
           "Deprecated"
         ]
+      },
+      "VersionInfo": {
+        "type": "object",
+        "description": "Version information for API compatibility checking",
+        "required": [
+          "api_version",
+          "server_version"
+        ],
+        "properties": {
+          "api_version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Current API version (integer, increments on breaking changes)",
+            "minimum": 0
+          },
+          "min_compatible_client": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Minimum client version that can use this API (optional, for future use)"
+          },
+          "server_version": {
+            "type": "string",
+            "description": "Server version (semver)",
+            "example": "0.12.10"
+          }
+        }
       }
     },
     "securitySchemes": {
-      "api_key": {
+      "daemon_api_key": {
         "type": "apiKey",
         "in": "header",
-        "name": "Authorization: Bearer",
-        "description": "API key for daemon authentication. Generate keys in the web UI under Settings > API Keys."
+        "name": "Authorization",
+        "description": "Daemon API key (Bearer scp_d_...). Requires X-Daemon-ID header."
       },
-      "session_id": {
+      "session": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "session_id"
+        "name": "session_id",
+        "description": "Browser session cookie. Obtained via /api/auth/login."
+      },
+      "user_api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "User API key (Bearer scp_u_...). Create in Platform > API Keys."
       }
     }
   },
@@ -12606,6 +12807,10 @@
     {
       "name": "subnets",
       "description": "IP subnets within networks. Define address ranges and organize hosts by subnet."
+    },
+    {
+      "name": "system",
+      "description": "System information endpoints. Version and compatibility checking."
     },
     {
       "name": "tags",

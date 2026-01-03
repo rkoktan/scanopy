@@ -5,7 +5,7 @@ use crate::server::{
             api::{LoginRequest, RegisterRequest},
             base::{LoginRegisterParams, PendingSetup, ProvisionUserParams},
         },
-        middleware::auth::{AuthMethod, AuthenticatedEntity},
+        middleware::auth::AuthenticatedEntity,
     },
     email::traits::EmailService,
     organizations::{
@@ -136,7 +136,7 @@ impl AuthService {
                 metadata: serde_json::json!({
                     "method": "password"
                 }),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -261,7 +261,7 @@ impl AuthService {
                     operation: TelemetryOperation::OrgCreated,
                     timestamp: Utc::now(),
                     metadata: serde_json::json!({}),
-                    auth_method: authentication.auth_method(),
+
                     authentication,
                 })
                 .await?;
@@ -306,7 +306,7 @@ impl AuthService {
                         metadata: serde_json::json!({
                             "method": "password",
                         }),
-                        auth_method: authentication.auth_method(),
+
                         authentication,
                     })
                     .await?;
@@ -329,7 +329,6 @@ impl AuthService {
                             "method": "password",
                             "email": request.email
                         }),
-                        auth_method: AuthMethod::Anonymous,
                         authentication: AuthenticatedEntity::Anonymous,
                     })
                     .await?;
@@ -422,7 +421,7 @@ impl AuthService {
                 ip_address: ip,
                 user_agent,
                 metadata: serde_json::json!({}),
-                auth_method: authentication.auth_method(),
+
                 authentication: authentication.clone(),
             })
             .await?;
@@ -469,7 +468,6 @@ impl AuthService {
                 ip_address: ip,
                 user_agent,
                 metadata: serde_json::json!({}),
-                auth_method: AuthMethod::Anonymous,
                 authentication: AuthenticatedEntity::Anonymous,
             })
             .await?;
@@ -521,7 +519,7 @@ impl AuthService {
                 ip_address: ip,
                 user_agent,
                 metadata: serde_json::json!({}),
-                auth_method: authentication.auth_method(),
+
                 authentication,
             })
             .await?;
@@ -558,7 +556,7 @@ impl AuthService {
                     ip_address: ip,
                     user_agent,
                     metadata: serde_json::json!({}),
-                    auth_method: authentication.auth_method(),
+
                     authentication,
                 })
                 .await?;

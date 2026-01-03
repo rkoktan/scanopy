@@ -80,7 +80,6 @@ pub enum AuthenticatedEntity {
         organization_id: Uuid,
         permissions: UserOrgPermissions,
         network_ids: Vec<Uuid>,
-        email: EmailAddress,
     },
     System,
     Anonymous,
@@ -191,18 +190,6 @@ impl AuthenticatedEntity {
         )
     }
 
-    /// Check if this entity has at least the specified permission level.
-    /// Returns true for User/ApiKey with sufficient permissions, or for Daemon when min_level is Member.
-    pub fn has_min_permission(&self, min_level: UserOrgPermissions) -> bool {
-        match self {
-            AuthenticatedEntity::User { permissions, .. }
-            | AuthenticatedEntity::ApiKey { permissions, .. } => *permissions >= min_level,
-            // Daemons have implicit Member-level access for their network
-            AuthenticatedEntity::Daemon { .. } => min_level <= UserOrgPermissions::Member,
-            _ => false,
-        }
-    }
-
     /// Check if this entity has access to the specified network
     pub fn has_network_access(&self, network_id: &Uuid) -> bool {
         self.network_ids().contains(network_id)
@@ -212,19 +199,7 @@ impl AuthenticatedEntity {
     pub fn email(&self) -> Option<&EmailAddress> {
         match self {
             AuthenticatedEntity::User { email, .. } => Some(email),
-            AuthenticatedEntity::ApiKey { email, .. } => Some(email),
             _ => None,
-        }
-    }
-
-    /// Get authentication method for audit logging
-    pub fn auth_method(&self) -> AuthMethod {
-        match self {
-            AuthenticatedEntity::User { .. } => AuthMethod::Session,
-            AuthenticatedEntity::ApiKey { .. } => AuthMethod::UserApiKey,
-            AuthenticatedEntity::Daemon { .. } => AuthMethod::DaemonApiKey,
-            AuthenticatedEntity::System => AuthMethod::System,
-            AuthenticatedEntity::Anonymous => AuthMethod::Anonymous,
         }
     }
 
@@ -321,22 +296,25 @@ impl AuthenticatedEntity {
                             return Err(AuthError(e));
                         }
 
-                        // Fetch user to get email for audit trail
-                        let user = app_state
+                        let organization_has_api_access = app_state
                             .services
-                            .user_service
-                            .get_by_id(&user_id)
+                            .organization_service
+                            .get_by_id(&organization_id)
                             .await
-                            .map_err(|_| {
-                                AuthError(ApiError::internal_error(
-                                    "Failed to fetch user for API key",
-                                ))
-                            })?
-                            .ok_or_else(|| {
-                                AuthError(ApiError::unauthorized(
-                                    "API key owner not found".to_string(),
-                                ))
-                            })?;
+                            .unwrap_or_default()
+                            .map(|o| {
+                                o.base
+                                    .plan
+                                    .map(|p| p.features().api_access)
+                                    .unwrap_or(false)
+                            })
+                            .unwrap_or(false);
+
+                        if !organization_has_api_access {
+                            return Err(AuthError(ApiError::payment_required(
+                                "Your plan does not include api access",
+                            )));
+                        }
 
                         // Get network access from junction table
                         let network_ids = app_state
@@ -360,7 +338,6 @@ impl AuthenticatedEntity {
                             organization_id,
                             permissions,
                             network_ids,
-                            email: user.base.email,
                         });
                     }
 
@@ -414,30 +391,10 @@ impl AuthenticatedEntity {
                                 .await;
                         });
 
-                        // Validate daemon exists and belongs to this network
-                        let daemon = app_state
-                            .services
-                            .daemon_service
-                            .get_by_id(&daemon_id)
-                            .await
-                            .map_err(|e| {
-                                AuthError(ApiError::internal_error(&format!(
-                                    "Failed to fetch daemon: {}",
-                                    e
-                                )))
-                            })?
-                            .ok_or_else(|| {
-                                AuthError(ApiError::unauthorized(
-                                    "X-Daemon-ID header references non-existent daemon".to_string(),
-                                ))
-                            })?;
-
-                        if daemon.base.network_id != network_id {
-                            return Err(AuthError(ApiError::unauthorized(
-                                "Daemon does not belong to the authorized network".to_string(),
-                            )));
-                        }
-
+                        // Note: We don't validate that the daemon exists here because:
+                        // 1. The daemon may be registering for the first time (doesn't exist yet)
+                        // 2. The API key's network_id is the source of truth for authorization
+                        // 3. Individual handlers validate daemon-network consistency as needed
                         return Ok(AuthenticatedEntity::Daemon {
                             network_id,
                             api_key_id,
@@ -514,7 +471,6 @@ pub struct AuthenticatedApiKey {
     pub organization_id: Uuid,
     pub permissions: UserOrgPermissions,
     pub network_ids: Vec<Uuid>,
-    pub email: EmailAddress,
 }
 
 impl From<AuthenticatedApiKey> for AuthenticatedEntity {
@@ -525,7 +481,6 @@ impl From<AuthenticatedApiKey> for AuthenticatedEntity {
             organization_id: value.organization_id,
             permissions: value.permissions,
             network_ids: value.network_ids,
-            email: value.email,
         }
     }
 }
@@ -546,14 +501,12 @@ where
                 organization_id,
                 permissions,
                 network_ids,
-                email,
             } => Ok(AuthenticatedApiKey {
                 api_key_id,
                 user_id,
                 organization_id,
                 permissions,
                 network_ids,
-                email,
             }),
             _ => Err(AuthError(ApiError::unauthorized(
                 "API key authentication required".to_string(),

@@ -9,23 +9,6 @@
 //! - Permission levels: `Viewer`, `Member`, `Admin`, `Owner` - check User/ApiKey permission levels
 //! - Auth type requirements: `IsDaemon`, `IsUser`, `IsApiKey` - check authentication type
 //! - Combinators: `Or<A, B>` - compose requirements
-//!
-//! # Examples
-//!
-//! ```rust
-//! // Read endpoint - viewers and daemons can access
-//! async fn get_hosts(auth: Authorized<Or<Viewer, IsDaemon>>) -> ApiResult<...>
-//!
-//! // Write endpoint - members only (no daemon)
-//! async fn delete_host(auth: Authorized<Member>) -> ApiResult<...>
-//!
-//! // Admin endpoint
-//! async fn manage_api_keys(auth: Authorized<Admin>) -> ApiResult<...>
-//!
-//! // Daemon-only endpoint
-//! async fn daemon_heartbeat(auth: Authorized<IsDaemon>) -> ApiResult<...>
-//! ```
-
 use std::marker::PhantomData;
 
 use crate::server::auth::middleware::auth::AuthError;
@@ -304,27 +287,6 @@ where
 ///
 /// This is the primary way to protect endpoints. It extracts the authenticated
 /// entity, checks the permission requirement, and provides access to the entity.
-///
-/// # Type Parameters
-///
-/// - `P`: The permission requirement to enforce
-///
-/// # Examples
-///
-/// ```rust
-/// async fn get_hosts(auth: Authorized<Viewer>) -> ApiResult<...> {
-///     let network_ids = auth.network_ids();
-///     // auth.entity contains the full AuthenticatedEntity
-/// }
-///
-/// async fn admin_action(auth: Authorized<Admin>) -> ApiResult<...> {
-///     let org_id = auth.organization_id();
-/// }
-///
-/// async fn member_or_daemon(auth: Authorized<Or<Member, IsDaemon>>) -> ApiResult<...> {
-///     // Works for both members and daemons
-/// }
-/// ```
 pub struct Authorized<P: PermissionRequirement> {
     /// The authenticated entity that passed the permission check.
     pub entity: AuthenticatedEntity,

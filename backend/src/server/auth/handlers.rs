@@ -18,10 +18,8 @@ use crate::server::{
     },
     config::{AppState, DeploymentType, get_deployment_type},
     daemon_api_keys::r#impl::base::{DaemonApiKey, DaemonApiKeyBase},
-    daemon_api_keys::r#impl::base::{DaemonApiKey, DaemonApiKeyBase},
     invites::handlers::process_pending_invite,
     networks::r#impl::{Network, NetworkBase},
-    shared::api_key_common::{ApiKeyType, generate_api_key_for_storage},
     shared::api_key_common::{ApiKeyType, generate_api_key_for_storage},
     shared::{
         events::types::{TelemetryEvent, TelemetryOperation},
@@ -458,7 +456,6 @@ async fn apply_pending_setup(
                 "pre_registration_setup": true,
                 "network_count": setup.networks.len()
             }),
-            auth_method: auth_entity.auth_method(),
             authentication: auth_entity,
         })
         .await
