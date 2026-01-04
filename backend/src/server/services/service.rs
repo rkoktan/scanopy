@@ -16,6 +16,7 @@ use crate::server::{
             bus::EventBus,
             types::{EntityEvent, EntityOperation},
         },
+        position::next_position,
         services::traits::{ChildCrudService, CrudService, EventBusService},
         storage::{filter::EntityFilter, generic::GenericPostgresStorage, traits::Storage},
         types::{api::ValidationError, entities::EntitySource},
@@ -121,6 +122,9 @@ impl CrudService<Service> for ServiceService {
         let filter = EntityFilter::unfiltered().host_id(&service.base.host_id);
         let existing_services = self.get_all(filter).await?;
 
+        // Auto-assign position for new services (next available position on host)
+        let next_pos = next_position(&existing_services);
+
         let service_from_storage = match existing_services
             .into_iter()
             .find(|existing: &Service| *existing == service)
@@ -140,6 +144,9 @@ impl CrudService<Service> for ServiceService {
                     .await?
             }
             _ => {
+                // Auto-assign position (users cannot set position via /api/services)
+                service.base.position = next_pos;
+
                 // Validate bindings don't conflict with each other before creating
                 Self::validate_bindings_no_conflicts(&service.base.bindings)?;
 
@@ -333,6 +340,30 @@ impl ServiceService {
             service_locks: Arc::new(Mutex::new(HashMap::new())),
             event_bus,
         }
+    }
+
+    /// Get all services matching filter, ordered by the specified column.
+    /// Also loads bindings for each service.
+    pub async fn get_all_ordered(
+        &self,
+        filter: EntityFilter,
+        order_by: &str,
+    ) -> Result<Vec<Service>> {
+        let mut services = self.storage.get_all_ordered(filter, order_by).await?;
+        if services.is_empty() {
+            return Ok(services);
+        }
+
+        let service_ids: Vec<Uuid> = services.iter().map(|s| s.id).collect();
+        let bindings_map = self.binding_service.get_for_parents(&service_ids).await?;
+
+        for service in &mut services {
+            if let Some(bindings) = bindings_map.get(&service.id) {
+                service.base.bindings = bindings.clone();
+            }
+        }
+
+        Ok(services)
     }
 
     async fn get_service_lock(&self, service_id: &Uuid) -> Arc<Mutex<()>> {

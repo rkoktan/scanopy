@@ -1,6 +1,6 @@
 [package]
 name = "scanopy-server"
-version = "0.12.10"
+version = "0.13.0"
 edition = "2024"
 description = "Scanopy HTTP API server"
 
@@ -188,6 +188,7 @@ tar = "0.4"
 testcontainers = "0.25.0"
 top-english-words = "1.1.1"
 comrak = "0.48.0"
+jsonschema = "0.29"
 
 [features]
 generate-fixtures = []
