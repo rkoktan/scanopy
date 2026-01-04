@@ -109,7 +109,6 @@ async fn get_host_by_id(
 ///
 /// Creates a host with optional interfaces, ports, and services.
 /// The `source` field is automatically set to `Manual`.
-/// IDs for the host and all children are generated server-side.
 ///
 /// ### Tag Validation
 ///
@@ -117,12 +116,6 @@ async fn get_host_by_id(
 /// - Duplicate tag UUIDs are automatically deduplicated
 /// - Invalid or cross-organization tag UUIDs return a 400 error
 ///
-/// ### Legacy Format (Daemon Backwards Compatibility)
-///
-/// This endpoint also accepts the legacy `HostWithServicesRequest` format
-/// from old daemons. Legacy requests are automatically detected and
-/// transformed to the new format. Legacy support will be removed in a
-/// future release.
 #[utoipa::path(
     post,
     path = "",
@@ -133,7 +126,7 @@ async fn get_host_by_id(
         (status = 400, description = "Validation error: network not found, subnet mismatch, or invalid tags", body = ApiErrorResponse),
         (status = 401, description = "No access to the specified network", body = ApiErrorResponse),
     ),
-    security(("session" = []), ("user_api_key" = []), ("daemon_api_key" = []))
+    security( ("user_api_key" = []),("session" = []), ("daemon_api_key" = []))
 )]
 async fn create_host(
     State(state): State<Arc<AppState>>,

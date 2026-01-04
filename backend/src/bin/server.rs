@@ -223,9 +223,9 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("🚀 Scanopy Server v{}", env!("CARGO_PKG_VERSION"));
     if web_external_path.is_some() {
-        tracing::info!("📊 Web UI: http://{}", public_url);
+        tracing::info!("📊 Web UI: {}", public_url);
     }
-    tracing::info!("🔧 API: http://{}/api", public_url);
+    tracing::info!("🔧 API: {}/api", public_url);
 
     // Spawn server in background
     tokio::spawn(async move {

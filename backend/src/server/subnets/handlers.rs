@@ -47,7 +47,7 @@ pub fn create_router() -> OpenApiRouter<Arc<AppState>> {
     responses(
         (status = 200, description = "List of subnets", body = ApiResponse<Vec<Subnet>>),
     ),
-    security(("session" = []), ("user_api_key" = []), ("daemon_api_key" = []))
+    security( ("user_api_key" = []),("session" = []), ("daemon_api_key" = []))
 )]
 async fn get_all_subnets(
     state: State<Arc<AppState>>,
@@ -99,7 +99,7 @@ async fn get_all_subnets(
         (status = 200, description = "Subnet created successfully", body = ApiResponse<Subnet>),
         (status = 400, description = "Invalid request", body = ApiErrorResponse),
     ),
-    security(("session" = []), ("user_api_key" = []), ("daemon_api_key" = []))
+    security( ("user_api_key" = []),("session" = []), ("daemon_api_key" = []))
 )]
 async fn create_subnet(
     state: State<Arc<AppState>>,

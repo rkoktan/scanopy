@@ -194,7 +194,7 @@ impl DaemonRuntimeService {
             .is_ok();
 
         // Always check with server using daemon_id - this is the source of truth
-        // for whether we're registered, not local host_id state
+        // for whether we're registered
         tracing::info!(
             daemon_id = %daemon_id,
             network_id = %network_id,
