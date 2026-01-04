@@ -773,20 +773,12 @@ export interface paths {
          * Create a new host
          * @description Creates a host with optional interfaces, ports, and services.
          *     The `source` field is automatically set to `Manual`.
-         *     IDs for the host and all children are generated server-side.
          *
          *     ### Tag Validation
          *
          *     - Tags must exist and belong to your organization
          *     - Duplicate tag UUIDs are automatically deduplicated
          *     - Invalid or cross-organization tag UUIDs return a 400 error
-         *
-         *     ### Legacy Format (Daemon Backwards Compatibility)
-         *
-         *     This endpoint also accepts the legacy `HostWithServicesRequest` format
-         *     from old daemons. Legacy requests are automatically detected and
-         *     transformed to the new format. Legacy support will be removed in a
-         *     future release.
          */
         post: operations["create_host"];
         delete?: never;
@@ -1724,14 +1716,14 @@ export interface components {
             /**
              * @description Association between a service and a port / interface that the service is listening on
              * @example {
-             *       "created_at": "2026-01-04T16:30:23.750794Z",
-             *       "id": "0bfd3678-8af2-4d58-b616-20068950f148",
+             *       "created_at": "2026-01-04T19:28:16.420911Z",
+             *       "id": "b7fbc28b-ef96-498f-a0e2-e4fef1fa3e57",
              *       "interface_id": "550e8400-e29b-41d4-a716-446655440005",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *       "type": "Port",
-             *       "updated_at": "2026-01-04T16:30:23.750794Z"
+             *       "updated_at": "2026-01-04T19:28:16.420911Z"
              *     }
              */
             data?: components["schemas"]["BindingBase"] & {
@@ -2098,14 +2090,14 @@ export interface components {
              * @example {
              *       "bindings": [
              *         {
-             *           "created_at": "2026-01-04T16:30:23.746643Z",
-             *           "id": "894dbb91-f34e-43a0-85e9-5b82fc529e7d",
+             *           "created_at": "2026-01-04T19:28:16.416832Z",
+             *           "id": "4edb950c-1b30-44fb-9f7e-f1d4a0c04d50",
              *           "interface_id": "550e8400-e29b-41d4-a716-446655440005",
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *           "type": "Port",
-             *           "updated_at": "2026-01-04T16:30:23.746643Z"
+             *           "updated_at": "2026-01-04T19:28:16.416832Z"
              *         }
              *       ],
              *       "created_at": "2026-01-15T10:30:00Z",
@@ -2114,7 +2106,7 @@ export interface components {
              *       "name": "nginx",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "position": 0,
-             *       "service_definition": "Bitbucket Server",
+             *       "service_definition": "Lubelogger",
              *       "source": {
              *         "type": "Manual"
              *       },
@@ -2619,14 +2611,14 @@ export interface components {
         /**
          * @description Association between a service and a port / interface that the service is listening on
          * @example {
-         *       "created_at": "2026-01-04T16:30:23.737021Z",
-         *       "id": "7717433d-b31e-4f1f-8428-e094da5ccd4b",
+         *       "created_at": "2026-01-04T19:28:16.407427Z",
+         *       "id": "01038e27-0437-41b6-9d48-3253b0a5851a",
          *       "interface_id": "550e8400-e29b-41d4-a716-446655440005",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *       "type": "Port",
-         *       "updated_at": "2026-01-04T16:30:23.737021Z"
+         *       "updated_at": "2026-01-04T19:28:16.407427Z"
          *     }
          */
         Binding: components["schemas"]["BindingBase"] & {
@@ -2665,7 +2657,10 @@ export interface components {
              * @description Client-provided UUID for this binding
              */
             id: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description null = bind to all interfaces
+             */
             interface_id?: string | null;
             /** Format: uuid */
             port_id: string;
@@ -2757,7 +2752,24 @@ export interface components {
          *           "protocol": "Tcp"
          *         }
          *       ],
-         *       "services": [],
+         *       "services": [
+         *         {
+         *           "bindings": [
+         *             {
+         *               "id": "550e8400-e29b-41d4-a716-446655440009",
+         *               "interface_id": "550e8400-e29b-41d4-a716-446655440005",
+         *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
+         *               "type": "Port"
+         *             }
+         *           ],
+         *           "id": "550e8400-e29b-41d4-a716-446655440007",
+         *           "name": "nginx",
+         *           "position": 0,
+         *           "service_definition": "Lubelogger",
+         *           "tags": [],
+         *           "virtualization": null
+         *         }
+         *       ],
          *       "tags": [],
          *       "virtualization": null
          *     }
@@ -3272,9 +3284,12 @@ export interface components {
             name?: string | null;
             /**
              * Format: int32
-             * @description Position of this interface in the host's interface list (for ordering)
+             * @description Position in the host's interface list (for ordering).
+             *     If omitted on create: appends to end of list.
+             *     If omitted on update: existing interfaces keep their positions; new interfaces append.
+             *     Must be all specified or all omitted across all interfaces in the request.
              */
-            position?: number;
+            position?: number | null;
             /** Format: uuid */
             subnet_id: string;
         };
@@ -3540,14 +3555,14 @@ export interface components {
          * @example {
          *       "bindings": [
          *         {
-         *           "created_at": "2026-01-04T16:30:23.736925Z",
-         *           "id": "5e6ebe1a-8b5c-43e8-9a14-dd962723c165",
+         *           "created_at": "2026-01-04T19:28:16.407332Z",
+         *           "id": "6842f35e-b835-44cc-a2c1-e2c4cc27c422",
          *           "interface_id": "550e8400-e29b-41d4-a716-446655440005",
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *           "type": "Port",
-         *           "updated_at": "2026-01-04T16:30:23.736925Z"
+         *           "updated_at": "2026-01-04T19:28:16.407332Z"
          *         }
          *       ],
          *       "created_at": "2026-01-15T10:30:00Z",
@@ -3556,7 +3571,7 @@ export interface components {
          *       "name": "nginx",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "position": 0,
-         *       "service_definition": "Bitbucket Server",
+         *       "service_definition": "Lubelogger",
          *       "source": {
          *         "type": "Manual"
          *       },
@@ -3610,9 +3625,12 @@ export interface components {
             name: string;
             /**
              * Format: int32
-             * @description Position of this service in the host's service list (for ordering)
+             * @description Position in the host's service list (for ordering).
+             *     If omitted on create: appends to end of list.
+             *     If omitted on update: existing services keep their positions; new services append.
+             *     Must be all specified or all omitted across all services in the request.
              */
-            position?: number;
+            position?: number | null;
             /** @description Service definition ID (e.g., "Nginx", "PostgreSQL") */
             service_definition: string;
             /** @description Tags for categorization */

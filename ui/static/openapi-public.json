@@ -2048,7 +2048,7 @@
           "hosts"
         ],
         "summary": "Create a new host",
-        "description": "Creates a host with optional interfaces, ports, and services.\nThe `source` field is automatically set to `Manual`.\n\n### Tag Validation\n\n- Tags must exist and belong to your organization\n- Duplicate tag UUIDs are automatically deduplicated\n- Invalid or cross-organization tag UUIDs return a 400 error\n\n### Legacy Format (Daemon Backwards Compatibility)\n\nThis endpoint also accepts the legacy `HostWithServicesRequest` format\nfrom old daemons. Legacy requests are automatically detected and\ntransformed to the new format. Legacy support will be removed in a\nfuture release.",
+        "description": "Creates a host with optional interfaces, ports, and services.\nThe `source` field is automatically set to `Manual`.\n\n### Tag Validation\n\n- Tags must exist and belong to your organization\n- Duplicate tag UUIDs are automatically deduplicated\n- Invalid or cross-organization tag UUIDs return a 400 error\n\n",
         "operationId": "create_host",
         "requestBody": {
           "content": {
@@ -2094,10 +2094,10 @@
         },
         "security": [
           {
-            "session": []
+            "user_api_key": []
           },
           {
-            "user_api_key": []
+            "session": []
           },
           {
             "daemon_api_key": []
@@ -4382,10 +4382,10 @@
         },
         "security": [
           {
-            "session": []
+            "user_api_key": []
           },
           {
-            "user_api_key": []
+            "session": []
           },
           {
             "daemon_api_key": []
@@ -4432,10 +4432,10 @@
         },
         "security": [
           {
-            "session": []
+            "user_api_key": []
           },
           {
-            "user_api_key": []
+            "session": []
           },
           {
             "daemon_api_key": []
@@ -5287,14 +5287,14 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-01-04T17:16:06.957856Z",
-              "id": "d47e4afd-1fe9-48ca-965c-10fd71990a34",
+              "created_at": "2026-01-04T19:28:16.420908Z",
+              "id": "a49072a3-30dd-4f3b-b3b6-010b77b57c1f",
               "interface_id": "550e8400-e29b-41d4-a716-446655440005",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-01-04T17:16:06.957856Z"
+              "updated_at": "2026-01-04T19:28:16.420908Z"
             }
           },
           "error": {
@@ -6454,14 +6454,14 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-01-04T17:16:06.954784Z",
-                  "id": "31386a9f-ac66-4820-834e-829a74399482",
+                  "created_at": "2026-01-04T19:28:16.416849Z",
+                  "id": "dcc3b6f1-4183-41d8-bd23-1583b5dd6a36",
                   "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-01-04T17:16:06.954784Z"
+                  "updated_at": "2026-01-04T19:28:16.416849Z"
                 }
               ],
               "created_at": "2026-01-15T10:30:00Z",
@@ -6470,7 +6470,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Oracle Database",
+              "service_definition": "Lubelogger",
               "source": {
                 "type": "Manual"
               },
@@ -7171,14 +7171,14 @@
               ],
               "description": "Association between a service and a port / interface that the service is listening on",
               "example": {
-                "created_at": "2026-01-04T17:16:06.957653Z",
-                "id": "efa1e5b4-b18c-405f-bf0e-bc0831a9d504",
+                "created_at": "2026-01-04T19:28:16.420579Z",
+                "id": "9aa06e79-6901-4d79-b981-88aed629b90e",
                 "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "port_id": "550e8400-e29b-41d4-a716-446655440006",
                 "service_id": "550e8400-e29b-41d4-a716-446655440007",
                 "type": "Port",
-                "updated_at": "2026-01-04T17:16:06.957653Z"
+                "updated_at": "2026-01-04T19:28:16.420579Z"
               }
             }
           },
@@ -7975,14 +7975,14 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-01-04T17:16:06.953596Z",
-                    "id": "6a2c4509-ac44-4764-b496-e74ba58222af",
+                    "created_at": "2026-01-04T19:28:16.415502Z",
+                    "id": "4f70531c-91cf-4736-a6d9-5e64ad4549d2",
                     "interface_id": "550e8400-e29b-41d4-a716-446655440005",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-01-04T17:16:06.953596Z"
+                    "updated_at": "2026-01-04T19:28:16.415502Z"
                   }
                 ],
                 "created_at": "2026-01-15T10:30:00Z",
@@ -7991,7 +7991,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Oracle Database",
+                "service_definition": "Lubelogger",
                 "source": {
                   "type": "Manual"
                 },
@@ -8685,14 +8685,14 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-01-04T17:16:06.945800Z",
-          "id": "2ed43ae2-a743-4c0f-bfc8-fd9c4a20cb19",
+          "created_at": "2026-01-04T19:28:16.407439Z",
+          "id": "78b0c04b-ad5b-4746-9b12-2b1d4a9ed1fb",
           "interface_id": "550e8400-e29b-41d4-a716-446655440005",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-01-04T17:16:06.945800Z"
+          "updated_at": "2026-01-04T19:28:16.407439Z"
         }
       },
       "BindingBase": {
@@ -9053,7 +9053,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Oracle Database",
+              "service_definition": "Lubelogger",
               "tags": [],
               "virtualization": null
             }
@@ -11569,14 +11569,14 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-01-04T17:16:06.945742Z",
-              "id": "cbe3ec16-5ce1-436c-9c09-e74229ec1c95",
+              "created_at": "2026-01-04T19:28:16.407343Z",
+              "id": "47747153-6ac9-405b-b8c3-f86f64da6123",
               "interface_id": "550e8400-e29b-41d4-a716-446655440005",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-01-04T17:16:06.945742Z"
+              "updated_at": "2026-01-04T19:28:16.407343Z"
             }
           ],
           "created_at": "2026-01-15T10:30:00Z",
@@ -11585,7 +11585,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Oracle Database",
+          "service_definition": "Lubelogger",
           "source": {
             "type": "Manual"
           },

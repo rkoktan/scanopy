@@ -19,7 +19,7 @@
 	let topologiesData = $derived(topologiesQuery.data ?? []);
 	let topology = $derived(topologiesData.find((t) => t.id === $selectedTopologyId));
 
-	let baseViewer: BaseTopologyViewer;
+	let baseViewer: BaseTopologyViewer | null = $state(null);
 
 	// Selection state synced with stores
 	let localSelectedNode: Node | null = $state(null);

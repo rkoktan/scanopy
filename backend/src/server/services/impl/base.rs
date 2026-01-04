@@ -42,6 +42,7 @@ pub struct ServiceBase {
     pub tags: Vec<Uuid>,
     /// Position of this service in the host's service list (for ordering)
     #[serde(default)]
+    #[schema(required)]
     pub position: i32,
 }
 
