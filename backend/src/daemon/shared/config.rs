@@ -85,10 +85,17 @@ pub struct DaemonCli {
     #[arg(long)]
     user_id: Option<Uuid>,
 
-    /// (Windows only) Use Npcap for broadcast ARP scanning instead of native SendARP.
-    /// Requires Npcap installation. Ignored on Linux/macOS.
+    /// Enable faster ARP scanning on Windows by using broadcast ARP via Npcap instead of native SendARP, which doesn't support broadcast. **Requires Npcap installation**. Ignored on Linux/macOS.
     #[arg(long)]
     use_npcap_arp: Option<bool>,
+
+    /// Number of ARP retry rounds for non-responding hosts (default: 2, meaning 3 total attempts)
+    #[arg(long)]
+    arp_retries: Option<u32>,
+
+    /// Maximum ARP packets per second (default: 50, conservative for enterprise switches)
+    #[arg(long)]
+    arp_rate_pps: Option<u32>,
 }
 
 /// Unified configuration struct that handles both startup and runtime config
@@ -137,6 +144,20 @@ pub struct AppConfig {
     /// (Windows only) Use Npcap for broadcast ARP scanning instead of native SendARP
     #[serde(default)]
     pub use_npcap_arp: bool,
+    /// Number of ARP retry rounds for non-responding hosts (0 = single attempt)
+    #[serde(default = "default_arp_retries")]
+    pub arp_retries: u32,
+    /// Maximum ARP packets per second (rate limiting for enterprise switch compatibility)
+    #[serde(default = "default_arp_rate_pps")]
+    pub arp_rate_pps: u32,
+}
+
+fn default_arp_retries() -> u32 {
+    2 // Default: 2 retries = 3 total attempts
+}
+
+fn default_arp_rate_pps() -> u32 {
+    50 // Default: 50 pps, safe for most enterprise switches
 }
 
 impl Default for AppConfig {
@@ -165,6 +186,8 @@ impl Default for AppConfig {
             docker_proxy_ssl_chain: None,
             docker_proxy_ssl_key: None,
             use_npcap_arp: false,
+            arp_retries: default_arp_retries(),
+            arp_rate_pps: default_arp_rate_pps(),
         }
     }
 }
@@ -256,6 +279,12 @@ impl AppConfig {
         if let Some(use_npcap_arp) = cli_args.use_npcap_arp {
             figment = figment.merge(("use_npcap_arp", use_npcap_arp));
         }
+        if let Some(arp_retries) = cli_args.arp_retries {
+            figment = figment.merge(("arp_retries", arp_retries));
+        }
+        if let Some(arp_rate_pps) = cli_args.arp_rate_pps {
+            figment = figment.merge(("arp_rate_pps", arp_rate_pps));
+        }
 
         let config: AppConfig = figment
             .extract()
@@ -309,7 +338,6 @@ impl ConfigStore {
         config.id = loaded_config.id;
         config.last_heartbeat = loaded_config.last_heartbeat;
 
-        tracing::info!("Loaded daemon runtime state from {}", self.path.display());
         Ok(())
     }
 
@@ -469,6 +497,16 @@ impl ConfigStore {
     pub async fn get_use_npcap_arp(&self) -> Result<bool> {
         let config = self.config.read().await;
         Ok(config.use_npcap_arp)
+    }
+
+    pub async fn get_arp_retries(&self) -> Result<u32> {
+        let config = self.config.read().await;
+        Ok(config.arp_retries)
+    }
+
+    pub async fn get_arp_rate_pps(&self) -> Result<u32> {
+        let config = self.config.read().await;
+        Ok(config.arp_rate_pps)
     }
 }
 

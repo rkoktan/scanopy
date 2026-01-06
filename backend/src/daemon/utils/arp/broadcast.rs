@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::net::Ipv4Addr;
 use std::time::{Duration, Instant};
 
@@ -12,8 +12,10 @@ use pnet::util::MacAddr;
 
 use super::types::ArpScanResult;
 
-const ARP_TIMEOUT: Duration = Duration::from_secs(2);
-const SEND_DELAY: Duration = Duration::from_micros(200);
+/// Wait time after each round before retrying non-responders
+pub const ROUND_WAIT: Duration = Duration::from_secs(3);
+/// Extra receive time after final round
+pub const POST_SCAN_RECEIVE: Duration = Duration::from_secs(5);
 
 /// Check if broadcast ARP is available (requires raw socket capability)
 pub fn is_available() -> bool {
@@ -34,32 +36,65 @@ pub fn is_available() -> bool {
     datalink::channel(&interface, config).is_ok()
 }
 
-/// Scan subnet using broadcast ARP
-/// Sends all ARP requests rapidly, then collects responses for ARP_TIMEOUT duration
-pub async fn scan_subnet(
+/// Scan subnet using broadcast ARP with targeted retries.
+/// Returns a channel receiver that provides results as they arrive.
+///
+/// # Arguments
+/// * `interface` - Network interface to scan on
+/// * `source_ip` - Source IP for ARP requests
+/// * `source_mac` - Source MAC for ARP requests
+/// * `targets` - List of IPs to scan
+/// * `retries` - Number of retry rounds for non-responding hosts (0 = single attempt)
+/// * `rate_pps` - Maximum packets per second (rate limiting for switch compatibility)
+pub fn scan_subnet(
     interface: &NetworkInterface,
     source_ip: Ipv4Addr,
     source_mac: MacAddress,
     targets: Vec<Ipv4Addr>,
-) -> Result<Vec<ArpScanResult>> {
+    retries: u32,
+    rate_pps: u32,
+) -> Result<std::sync::mpsc::Receiver<ArpScanResult>> {
+    use std::sync::mpsc;
+
     let interface = interface.clone();
     let target_set: HashSet<Ipv4Addr> = targets.iter().copied().collect();
 
-    // Run blocking network I/O in spawn_blocking
-    tokio::task::spawn_blocking(move || {
-        scan_subnet_blocking(&interface, source_ip, source_mac, target_set)
-    })
-    .await?
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn background thread for the entire ARP scan
+    std::thread::spawn(move || {
+        if let Err(e) = scan_subnet_background(
+            &interface, source_ip, source_mac, target_set, retries, rate_pps, tx,
+        ) {
+            tracing::warn!(error = %e, "ARP scan background thread failed");
+        }
+    });
+
+    Ok(rx)
 }
 
-fn scan_subnet_blocking(
+fn scan_subnet_background(
     interface: &NetworkInterface,
     source_ip: Ipv4Addr,
     source_mac: MacAddress,
     targets: HashSet<Ipv4Addr>,
-) -> Result<Vec<ArpScanResult>> {
+    retries: u32,
+    rate_pps: u32,
+    result_tx: std::sync::mpsc::Sender<ArpScanResult>,
+) -> Result<()> {
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    // Calculate send delay from rate limit (pps -> microseconds between packets)
+    // rate_pps of 50 = 20ms between packets, rate_pps of 1000 = 1ms
+    let send_delay = Duration::from_micros(1_000_000 / rate_pps.max(1) as u64);
+
+    // Use a larger buffer to avoid dropping packets
     let config = pnet::datalink::Config {
         read_timeout: Some(Duration::from_millis(50)),
+        read_buffer_size: 65536,
+        write_buffer_size: 65536,
         ..Default::default()
     };
 
@@ -77,68 +112,234 @@ fn scan_subnet_blocking(
         source_mac.bytes()[5],
     );
 
-    // Phase 1: Send all ARP requests
+    let total_rounds = 1 + retries;
+    let target_count = targets.len();
+
     tracing::debug!(
         interface = %interface.name,
         source_ip = %source_ip,
-        targets = targets.len(),
-        "Sending broadcast ARP requests"
+        targets = target_count,
+        total_rounds,
+        rate_pps,
+        send_delay_ms = send_delay.as_millis(),
+        "Starting ARP scan with concurrent send/receive"
     );
 
-    for target_ip in &targets {
-        let packet = build_arp_request(source_mac_pnet, source_ip, *target_ip);
-        if let Some(Err(e)) = tx.send_to(&packet, None) {
-            tracing::trace!(target = %target_ip, error = %e, "Failed to send ARP request");
-        }
-        std::thread::sleep(SEND_DELAY);
-    }
+    // Shared state between sender and receiver threads
+    let found_ips = Arc::new(Mutex::new(HashSet::<Ipv4Addr>::new()));
+    let sending_done = Arc::new(AtomicBool::new(false));
+    let current_round = Arc::new(AtomicU32::new(1));
 
-    // Phase 2: Collect responses
-    let mut results: HashMap<Ipv4Addr, MacAddress> = HashMap::new();
-    let deadline = Instant::now() + ARP_TIMEOUT;
+    // Stats for logging
+    let total_packets_received = Arc::new(AtomicU32::new(0));
+    let total_arp_replies = Arc::new(AtomicU32::new(0));
 
-    tracing::debug!(
-        timeout_secs = ARP_TIMEOUT.as_secs(),
-        "Collecting ARP responses"
-    );
+    let targets_clone = targets.clone();
+    let found_ips_recv = found_ips.clone();
+    let sending_done_recv = sending_done.clone();
+    let total_packets_received_clone = total_packets_received.clone();
+    let total_arp_replies_clone = total_arp_replies.clone();
+    let current_round_recv = current_round.clone();
 
-    while Instant::now() < deadline {
-        match rx.next() {
-            Ok(packet) => {
-                if let Some((ip, mac)) = parse_arp_reply(packet)
-                    && targets.contains(&ip)
-                    && !results.contains_key(&ip)
-                {
-                    tracing::trace!(ip = %ip, mac = %mac, "ARP response received");
-                    results.insert(ip, mac);
+    // Receiver thread - runs continuously while sending is in progress
+    let receiver_handle = thread::spawn(move || {
+        let our_mac = source_mac_pnet;
+        let start = Instant::now();
 
-                    // Early exit if we've found all targets
-                    if results.len() == targets.len() {
-                        tracing::debug!(
-                            found = results.len(),
-                            "All targets responded, exiting early"
-                        );
+        loop {
+            match rx.next() {
+                Ok(packet) => {
+                    total_packets_received_clone.fetch_add(1, Ordering::Relaxed);
+
+                    if let Some(ethernet) = EthernetPacket::new(packet) {
+                        // Skip our own outgoing packets
+                        if ethernet.get_source() == our_mac {
+                            continue;
+                        }
+
+                        if ethernet.get_ethertype() == EtherTypes::Arp
+                            && let Some(arp) = ArpPacket::new(ethernet.payload())
+                            && arp.get_operation() == ArpOperations::Reply
+                        {
+                            total_arp_replies_clone.fetch_add(1, Ordering::Relaxed);
+                            let sender_ip = arp.get_sender_proto_addr();
+
+                            if targets_clone.contains(&sender_ip) {
+                                let mut found = found_ips_recv.lock().unwrap();
+                                if !found.contains(&sender_ip) {
+                                    found.insert(sender_ip);
+                                    let mac = MacAddress::new(arp.get_sender_hw_addr().octets());
+                                    let round = current_round_recv.load(Ordering::Relaxed);
+
+                                    tracing::debug!(
+                                        round,
+                                        ip = %sender_ip,
+                                        mac = %mac,
+                                        "ARP: Host discovered"
+                                    );
+
+                                    let _ = result_tx.send(ArpScanResult { ip: sender_ip, mac });
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    // Timeout - check if we should stop
+                    if sending_done_recv.load(Ordering::Relaxed) {
+                        // Sender is done, do final receive period
                         break;
                     }
                 }
             }
-            Err(_) => {
-                // Read timeout, continue waiting
-                std::thread::sleep(Duration::from_millis(10));
+        }
+
+        // Final receive period to catch stragglers
+        tracing::debug!(
+            post_scan_secs = POST_SCAN_RECEIVE.as_secs(),
+            "Final receive period"
+        );
+        let final_deadline = Instant::now() + POST_SCAN_RECEIVE;
+
+        while Instant::now() < final_deadline {
+            match rx.next() {
+                Ok(packet) => {
+                    total_packets_received_clone.fetch_add(1, Ordering::Relaxed);
+
+                    if let Some(ethernet) = EthernetPacket::new(packet) {
+                        if ethernet.get_source() == our_mac {
+                            continue;
+                        }
+
+                        if ethernet.get_ethertype() == EtherTypes::Arp
+                            && let Some(arp) = ArpPacket::new(ethernet.payload())
+                            && arp.get_operation() == ArpOperations::Reply
+                        {
+                            total_arp_replies_clone.fetch_add(1, Ordering::Relaxed);
+                            let sender_ip = arp.get_sender_proto_addr();
+
+                            if targets_clone.contains(&sender_ip) {
+                                let mut found = found_ips_recv.lock().unwrap();
+                                if !found.contains(&sender_ip) {
+                                    found.insert(sender_ip);
+                                    let mac = MacAddress::new(arp.get_sender_hw_addr().octets());
+
+                                    tracing::debug!(
+                                        ip = %sender_ip,
+                                        mac = %mac,
+                                        "ARP: Late host discovered"
+                                    );
+
+                                    let _ = result_tx.send(ArpScanResult { ip: sender_ip, mac });
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    thread::sleep(Duration::from_millis(1));
+                }
             }
         }
-    }
 
-    tracing::debug!(
-        targets = targets.len(),
-        responsive = results.len(),
-        "Broadcast ARP scan complete"
-    );
+        let packets = total_packets_received_clone.load(Ordering::Relaxed);
+        let replies = total_arp_replies_clone.load(Ordering::Relaxed);
+        let found = found_ips_recv.lock().unwrap().len();
 
-    Ok(results
-        .into_iter()
-        .map(|(ip, mac)| ArpScanResult { ip, mac })
-        .collect())
+        tracing::debug!(
+            elapsed_secs = start.elapsed().as_secs(),
+            total_packets_received = packets,
+            total_arp_replies = replies,
+            hosts_found = found,
+            hosts_missed = target_count - found,
+            "ARP scan completed"
+        );
+    });
+
+    // Sender thread - sends packets with rate limiting
+    thread::spawn(move || {
+        let start = Instant::now();
+
+        // Process each round
+        for round in 1..=total_rounds {
+            current_round.store(round, Ordering::Relaxed);
+
+            // Determine which IPs to scan this round (exclude already found)
+            let round_targets: Vec<Ipv4Addr> = {
+                let found = found_ips.lock().unwrap();
+                targets
+                    .iter()
+                    .filter(|ip| !found.contains(ip))
+                    .copied()
+                    .collect()
+            };
+
+            if round_targets.is_empty() {
+                tracing::debug!(
+                    round,
+                    total_rounds,
+                    "All targets found, skipping remaining rounds"
+                );
+                break;
+            }
+
+            let found_before = found_ips.lock().unwrap().len();
+            tracing::debug!(
+                round,
+                total_rounds,
+                targets_this_round = round_targets.len(),
+                found_so_far = found_before,
+                "Starting ARP round"
+            );
+
+            // Send ARP requests for this round
+            let mut sent_ok = 0u64;
+            let mut sent_err = 0u64;
+
+            for target_ip in &round_targets {
+                let packet = build_arp_request(source_mac_pnet, source_ip, *target_ip);
+                match tx.send_to(&packet, None) {
+                    Some(Ok(())) => sent_ok += 1,
+                    Some(Err(e)) => {
+                        sent_err += 1;
+                        if sent_err <= 3 {
+                            tracing::warn!(target = %target_ip, error = %e, "Failed to send ARP request");
+                        }
+                    }
+                    None => sent_err += 1,
+                }
+                thread::sleep(send_delay);
+            }
+
+            tracing::debug!(round, sent_ok, sent_err, "ARP round send complete");
+
+            // Wait for responses before next round (targeted retry needs to know who responded)
+            thread::sleep(ROUND_WAIT);
+
+            let found_after = found_ips.lock().unwrap().len();
+            let found_this_round = found_after - found_before;
+            tracing::debug!(
+                round,
+                found_this_round,
+                total_found = found_after,
+                remaining = target_count - found_after,
+                "ARP round complete"
+            );
+        }
+
+        // Signal receiver that sending is done
+        sending_done.store(true, Ordering::Relaxed);
+
+        tracing::debug!(
+            elapsed_secs = start.elapsed().as_secs(),
+            "ARP sending complete, waiting for receiver"
+        );
+
+        // Wait for receiver to finish
+        let _ = receiver_handle.join();
+    });
+
+    Ok(())
 }
 
 fn build_arp_request(source_mac: MacAddr, source_ip: Ipv4Addr, target_ip: Ipv4Addr) -> Vec<u8> {
@@ -166,6 +367,7 @@ fn build_arp_request(source_mac: MacAddr, source_ip: Ipv4Addr, target_ip: Ipv4Ad
     ethernet_buffer
 }
 
+#[cfg(test)]
 fn parse_arp_reply(packet: &[u8]) -> Option<(Ipv4Addr, MacAddress)> {
     let ethernet = EthernetPacket::new(packet)?;
     if ethernet.get_ethertype() != EtherTypes::Arp {

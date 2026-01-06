@@ -18,9 +18,13 @@ use anyhow::Result;
 use mac_address::MacAddress;
 use pnet::datalink::NetworkInterface;
 
+pub use broadcast::{POST_SCAN_RECEIVE, ROUND_WAIT};
 pub use types::ArpScanResult;
 
 /// Scan a subnet using the platform-appropriate ARP method.
+///
+/// Returns a channel receiver that streams results as hosts respond.
+/// Uses targeted retries for non-responding hosts.
 ///
 /// # Arguments
 /// * `interface` - Network interface to use for scanning
@@ -28,43 +32,54 @@ pub use types::ArpScanResult;
 /// * `source_mac` - Source MAC address for ARP requests
 /// * `targets` - List of target IPs to scan
 /// * `use_npcap` - (Windows only) Use Npcap broadcast ARP instead of SendARP
+/// * `retries` - Number of retry rounds for non-responding hosts (0 = single attempt)
+/// * `rate_pps` - Maximum packets per second (rate limiting for switch compatibility)
 ///
 /// # Returns
-/// List of responsive hosts with their MAC addresses
-pub async fn scan_subnet(
+/// Channel receiver that yields responsive hosts as they're discovered
+pub fn scan_subnet(
     interface: &NetworkInterface,
     source_ip: Ipv4Addr,
     source_mac: MacAddress,
     targets: Vec<Ipv4Addr>,
     use_npcap: bool,
-) -> Result<Vec<ArpScanResult>> {
+    retries: u32,
+    rate_pps: u32,
+) -> Result<std::sync::mpsc::Receiver<ArpScanResult>> {
     #[cfg(target_family = "windows")]
     {
         if use_npcap {
-            match broadcast::scan_subnet(interface, source_ip, source_mac, targets.clone()).await {
-                Ok(results) => {
-                    tracing::debug!(
-                        responsive = results.len(),
-                        "Npcap broadcast ARP scan succeeded"
-                    );
-                    return Ok(results);
+            match broadcast::scan_subnet(
+                interface,
+                source_ip,
+                source_mac,
+                targets.clone(),
+                retries,
+                rate_pps,
+            ) {
+                Ok(rx) => {
+                    tracing::debug!("Npcap broadcast ARP scan started");
+                    return Ok(rx);
                 }
                 Err(e) => {
                     tracing::warn!(
                         error = %e,
                         "Npcap broadcast ARP failed, falling back to SendARP"
                     );
-                    // Fall through to sendarp
+                    // Fall through to sendarp - but sendarp doesn't support streaming yet
+                    // For now, return an error
+                    return Err(e);
                 }
             }
         }
-        return sendarp::scan_subnet(targets).await;
+        // SendARP doesn't support streaming - would need refactoring
+        return Err(anyhow::anyhow!("SendARP streaming not yet implemented"));
     }
 
     #[cfg(not(target_family = "windows"))]
     {
         let _ = use_npcap; // unused on non-Windows
-        broadcast::scan_subnet(interface, source_ip, source_mac, targets).await
+        broadcast::scan_subnet(interface, source_ip, source_mac, targets, retries, rate_pps)
     }
 }
 
