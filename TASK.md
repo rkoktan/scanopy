@@ -1,5 +1,6 @@
 > **First:** Read `CLAUDE.md` (project instructions) — you are a **worker**.
 
+<<<<<<< HEAD
 # Task: Disable Daemon Network Field After Key Generation (#436)
 
 ## Objective
@@ -33,11 +34,73 @@ Issue #436 reports that users can change a daemon's network in the UI after an A
 - [ ] Network field is disabled in daemon edit form when API keys exist for that daemon
 - [ ] Network field remains editable for daemons without API keys
 - [ ] Clear UI indication of why field is disabled (tooltip or helper text)
+=======
+# Task: Fix Browser RAM Leak (#424)
+
+## Objective
+
+Fix excessive RAM consumption (6GB+) in the Scanopy web UI, particularly during discovery sessions.
+
+## Background
+
+Users report a single browser tab consuming 6GB+ RAM, especially during discovery. One user reported Chrome using 16GB and eventually crashing with SIGILL.
+
+## Root Causes Identified
+
+Investigation identified these issues (prioritized):
+
+### CRITICAL
+
+1. **Unbounded query invalidation during discovery** (`ui/src/lib/features/discovery/queries.ts:374-378`)
+   - `DiscoverySSEManager` invalidates ALL hosts/services/subnets/daemons on EVERY progress update
+   - Each invalidation triggers full refetch of all data with nested entities
+   - During active discovery, this happens many times per second
+
+2. **Host tab fetches unlimited data** (`ui/src/lib/features/hosts/components/HostTab.svelte:37`)
+   - Uses `limit: 0` fetching ALL hosts with nested interfaces, ports, services
+   - Data duplicated across 4 separate caches (hosts + interfaces + ports + services)
+
+3. **Request cache accumulates** (`ui/src/lib/api/client.ts:57-78`)
+   - 250ms debounce window insufficient during rapid discovery invalidations
+   - Cloned Response objects pile up faster than cleanup
+
+### HIGH
+
+4. **No debounce on SSE message handler** (`ui/src/lib/features/discovery/queries.ts:364-445`)
+   - Query invalidations run synchronously on every SSE event
+   - No throttling before invalidating queries
+
+5. **DataControls re-processes full dataset** (`ui/src/lib/shared/components/data/DataControls.svelte:295-419`)
+   - `processedItems` derived state re-runs expensive filter/sort/group on every update
+   - With 10,000+ hosts, each invalidation re-processes entire list
+
+### MEDIUM
+
+6. **LastProgress map not cleaned** (`ui/src/lib/features/discovery/queries.ts:361,417`)
+   - Map entries persist if session doesn't reach terminal phase
+
+## Requirements
+
+1. Debounce/throttle discovery SSE invalidations - batch instead of firing on every progress update
+2. Add pagination or limits to host queries - don't fetch unlimited data
+3. Clear discovery-related caches when sessions complete
+4. Clean up lastProgress map on SSE disconnect
+5. Consider memoization for DataControls filter/sort operations
+
+## Acceptance Criteria
+
+- [ ] Discovery session with 1000+ hosts doesn't cause unbounded memory growth
+- [ ] Memory usage stays under ~500MB for typical usage
+- [ ] Query invalidations are debounced (e.g., max 1 per second during discovery)
+- [ ] Host tab uses pagination or reasonable limits
+- [ ] All existing functionality preserved
+>>>>>>> fix/ram-leak-424
 - [ ] `cd ui && npm test` passes
 - [ ] `make format && make lint` passes
 
 ## Files Likely Involved
 
+<<<<<<< HEAD
 - `ui/src/lib/features/daemons/components/` - Daemon form components
 - `ui/src/lib/features/daemon-api-keys/queries.ts` - API key queries
 
@@ -46,11 +109,25 @@ Issue #436 reports that users can change a daemon's network in the UI after an A
 - Keep it simple - just disable the field with explanation
 - Don't add backend validation, that's out of scope for this task
 - Match existing patterns for disabled form fields in the codebase
+=======
+- `ui/src/lib/features/discovery/queries.ts` - SSE manager, query invalidation
+- `ui/src/lib/features/hosts/components/HostTab.svelte` - Host query limits
+- `ui/src/lib/features/hosts/queries.ts` - Host query configuration
+- `ui/src/lib/api/client.ts` - Request cache cleanup
+- `ui/src/lib/shared/components/data/DataControls.svelte` - Data processing
+
+## Notes
+
+- Focus on the CRITICAL issues first - they likely account for most of the memory bloat
+- Test with browser dev tools Memory tab to verify improvements
+- Don't over-engineer - simple debouncing and limits should fix the worst issues
+>>>>>>> fix/ram-leak-424
 
 ---
 
 ## Work Summary
 
+<<<<<<< HEAD
 ### What was implemented
 
 Disabled the network selector in the daemon creation modal when an API key has been generated. Added a `disabledReason` prop to the `SelectNetwork` component to display explanatory text when the field is disabled.
@@ -82,3 +159,59 @@ None - implementation follows the task requirements exactly.
 
 - `make format && make lint` - Passed
 - `svelte-check` - 0 errors and 0 warnings
+=======
+### Changes Implemented
+
+**Backend:**
+- Added `ids` query parameter to `NetworkFilterQuery` and `HostChildQuery` in `backend/src/server/shared/handlers/query.rs` to enable selective entity loading
+
+**Frontend - SSE Throttling:**
+- Added 1-second throttle to `DiscoverySSEManager` query invalidations in `ui/src/lib/features/discovery/queries.ts`
+- Added cleanup of pending invalidation timer and lastProgress map on disconnect
+
+**Frontend - Host/Service Pagination and Selective Loading:**
+- Added `useHostsByIds` hook in `ui/src/lib/features/hosts/queries.ts` for selective host loading
+- Added `useServicesByIds` hook in `ui/src/lib/features/services/queries.ts` for selective service loading
+- Added pagination support to `useServicesQuery` with `ServicesQueryParams` interface
+- Changed `HostTab.svelte` to use `limit: 25` and selective service lookup for "Virtualized By" field
+- Changed `ServiceTab.svelte` to use `limit: 25` and selective host lookup for host name display
+
+**Frontend - Remove Expensive Card Computations:**
+- Removed `hostGroups` computation from `HostTab.svelte`
+- Removed `useHostsQuery`, VMs field, and Groups field from `HostCard.svelte`
+- Removed hosts display from `NetworkCard.svelte` and hosts query from `NetworksTab.svelte`
+- Removed services display from `SubnetCard.svelte` and hosts/services queries from `SubnetTab.svelte`
+
+**Frontend - Request Cache Improvements:**
+- Increased `DEBOUNCE_MS` from 250 to 500 in `ui/src/lib/api/client.ts`
+- Added `MAX_CACHE_SIZE = 50` with enforcement in cleanup to prevent unbounded cache growth
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `backend/src/server/shared/handlers/query.rs` | Added `ids` param to `NetworkFilterQuery` and `HostChildQuery` |
+| `ui/src/lib/features/discovery/queries.ts` | Throttled SSE invalidations, cleanup on disconnect |
+| `ui/src/lib/features/hosts/queries.ts` | Added `useHostsByIds` hook |
+| `ui/src/lib/features/services/queries.ts` | Added `useServicesByIds` hook, pagination support |
+| `ui/src/lib/features/hosts/components/HostTab.svelte` | Paginate to 25, remove hostGroups, selective service lookup |
+| `ui/src/lib/features/hosts/components/HostCard.svelte` | Remove hosts query, VMs field, Groups field |
+| `ui/src/lib/features/services/components/ServiceTab.svelte` | Paginate to 25, selective host lookup |
+| `ui/src/lib/features/networks/components/NetworkCard.svelte` | Remove hosts display |
+| `ui/src/lib/features/networks/components/NetworksTab.svelte` | Remove hosts query |
+| `ui/src/lib/features/subnets/components/SubnetCard.svelte` | Remove services display |
+| `ui/src/lib/features/subnets/components/SubnetTab.svelte` | Remove hosts/services queries |
+| `ui/src/lib/api/client.ts` | Improved cache cleanup with size limit |
+
+### Verification
+
+- Backend tests: PASS (3 passed, 0 failed)
+- Frontend type check: PASS (0 errors, 0 warnings)
+- Lint: PASS (format + eslint + svelte-check all clean)
+
+### Components That Still Load All Data (Acceptable)
+
+The following load on-demand when opened:
+- **Modals:** HostConsolidationModal, GroupEditModal, VirtualizationForm, VmManagerConfigPanel
+- **TopologyTab:** Needs complete graph data (future optimization candidate)
+>>>>>>> fix/ram-leak-424
