@@ -9,15 +9,16 @@ use crate::server::{
     auth::handlers as auth_handlers, billing::handlers as billing_handlers,
     bindings::handlers as binding_handlers, config::AppState,
     daemon_api_keys::handlers as daemon_api_key_handlers, daemons::handlers as daemon_handlers,
-    discovery::handlers as discovery_handlers, groups::handlers as group_handlers,
-    hosts::handlers as host_handlers, if_entries::handlers as if_entry_handlers,
-    interfaces::handlers as interface_handlers, invites::handlers as invite_handlers,
-    metrics::handlers as metrics_handlers, networks::handlers as network_handlers,
-    organizations::handlers as organization_handlers, ports::handlers as port_handlers,
-    services::handlers as service_handlers, shares::handlers as share_handlers,
-    snmp_credentials::handlers as snmp_credential_handlers, subnets::handlers as subnet_handlers,
-    tags::handlers as tag_handlers, topology::handlers as topology_handlers,
-    user_api_keys::handlers as user_api_key_handlers, users::handlers as user_handlers,
+    dashboard::handlers as dashboard_handlers, discovery::handlers as discovery_handlers,
+    groups::handlers as group_handlers, hosts::handlers as host_handlers,
+    if_entries::handlers as if_entry_handlers, interfaces::handlers as interface_handlers,
+    invites::handlers as invite_handlers, metrics::handlers as metrics_handlers,
+    networks::handlers as network_handlers, organizations::handlers as organization_handlers,
+    ports::handlers as port_handlers, services::handlers as service_handlers,
+    shares::handlers as share_handlers, snmp_credentials::handlers as snmp_credential_handlers,
+    subnets::handlers as subnet_handlers, tags::handlers as tag_handlers,
+    topology::handlers as topology_handlers, user_api_keys::handlers as user_api_key_handlers,
+    users::handlers as user_handlers,
 };
 use axum::Json;
 use axum::Router;
@@ -73,6 +74,7 @@ fn create_billed_openapi_routes() -> OpenApiRouter<Arc<AppState>> {
         .nest("/api/v1/networks", network_handlers::create_router())
         .nest("/api/v1/groups", group_handlers::create_router())
         .nest("/api/v1/daemons", daemon_handlers::create_router())
+        .nest("/api/v1/dashboard", dashboard_handlers::create_router())
         .nest("/api/v1/discovery", discovery_handlers::create_router())
         .nest("/api/v1/services", service_handlers::create_router())
         .nest("/api/v1/users", user_handlers::create_router())
@@ -116,6 +118,12 @@ fn create_exempt_openapi_routes() -> OpenApiRouter<Arc<AppState>> {
         )
 }
 
+/// Creates the public share router (unauthenticated, permissive CORS).
+/// Separated from the main router so these routes can use different CORS policy.
+pub fn create_public_share_routes() -> OpenApiRouter<Arc<AppState>> {
+    OpenApiRouter::new().nest("/api/v1/shares", share_handlers::create_public_router())
+}
+
 /// Creates the OpenApiRouter with cacheable routes.
 fn create_cacheable_openapi_routes() -> OpenApiRouter<Arc<AppState>> {
     OpenApiRouter::new()
@@ -131,9 +139,11 @@ pub fn collect_all_openapi_routes() -> OpenApi {
     let (_, mut openapi) = create_billed_openapi_routes().split_for_parts();
     let (_, exempt_openapi) = create_exempt_openapi_routes().split_for_parts();
     let (_, cacheable_openapi) = create_cacheable_openapi_routes().split_for_parts();
+    let (_, public_share_openapi) = create_public_share_routes().split_for_parts();
 
     openapi.merge(exempt_openapi);
     openapi.merge(cacheable_openapi);
+    openapi.merge(public_share_openapi);
     openapi
 }
 

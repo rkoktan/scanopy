@@ -33,8 +33,10 @@
 	import { useGroupsQuery } from '$lib/features/groups/queries';
 	import { useUsersQuery } from '$lib/features/users/queries';
 	import { useCurrentUserQuery } from '$lib/features/auth/queries';
+	import { useOrganizationQuery } from '$lib/features/organizations/queries';
+	import type { components } from '$lib/api/schema';
 	import { permissions } from '$lib/shared/stores/metadata';
-	import { modalState } from '$lib/shared/stores/modal-registry';
+	import { modalState, openModal } from '$lib/shared/stores/modal-registry';
 	import type { TabProps } from '$lib/shared/types';
 	import {
 		common_auto,
@@ -55,7 +57,7 @@
 		topology_submitToCommunity
 	} from '$lib/paraglide/messages';
 
-	let { isReadOnly = false }: TabProps = $props();
+	let { isReadOnly = false, isActive = false }: TabProps = $props();
 
 	// Get current user to check permissions
 	const currentUserQuery = useCurrentUserQuery();
@@ -72,6 +74,10 @@
 	const groupsQuery = useGroupsQuery();
 	const usersQuery = useUsersQuery({ enabled: () => canViewUsers });
 	const topologiesQuery = useTopologiesQuery();
+	const organizationQuery = useOrganizationQuery();
+
+	type TelemetryOperation = components['schemas']['TelemetryOperation'];
+	let onboarding = $derived((organizationQuery.data?.onboarding ?? []) as TelemetryOperation[]);
 
 	// Mutations
 	const deleteTopologyMutation = useDeleteTopologyMutation();
@@ -130,10 +136,48 @@
 	let isRefreshConflictsOpen = $state(false);
 	let isShareModalOpen = $state(false);
 
+	// Deep-link: open share modal from modal registry
+	$effect(() => {
+		if ($modalState.name === 'topology-share' && !isShareModalOpen) {
+			isShareModalOpen = true;
+		}
+	});
+
 	let topologyViewer: TopologyViewer | null = $state(null);
 
 	// Track which topologies have had their initial auto-rebuild check
 	let initialRebuildChecked = new SvelteSet<string>();
+	let onboardingRebuildChecked = new SvelteSet<string>();
+
+	// One-time rebuild for onboarding: triggers when FirstTopologyRebuild milestone is missing,
+	// regardless of autoRebuild setting, so the checklist item clears on first topology visit.
+	// Must run before auto-rebuild so it can trigger unconditionally.
+	// Guard on isActive because all tabs are mounted simultaneously (hidden via CSS).
+	$effect(() => {
+		if (!isActive) {
+			return;
+		}
+
+		if (!currentTopology || currentTopology.is_locked) {
+			return;
+		}
+
+		if (onboardingRebuildChecked.has(currentTopology.id)) {
+			return;
+		}
+
+		if (onboarding.includes('FirstTopologyRebuild')) {
+			return;
+		}
+
+		onboardingRebuildChecked.add(currentTopology.id);
+		// Also mark auto-rebuild as done to avoid a redundant second rebuild
+		initialRebuildChecked.add(currentTopology.id);
+
+		void rebuildTopologyMutation.mutateAsync(currentTopology).then(() => {
+			topologyViewer?.triggerFitView();
+		});
+	});
 
 	// Auto-rebuild on initial load when autoRebuild is enabled
 	$effect(() => {
@@ -142,7 +186,7 @@
 			return;
 		}
 
-		// Guard: already checked this topology
+		// Guard: already checked this topology (or handled by onboarding rebuild)
 		if (initialRebuildChecked.has(currentTopology.id)) {
 			return;
 		}
@@ -277,7 +321,7 @@
 				<div class="flex items-center gap-4 py-2">
 					<ExportButton />
 					{#if !isReadOnly}
-						<button class="btn-secondary" onclick={() => (isShareModalOpen = true)}>
+						<button class="btn-secondary" onclick={() => openModal('topology-share')}>
 							<Share2 class="my-1 h-5 w-5" />
 						</button>
 					{/if}
@@ -446,6 +490,7 @@
 		onCancel={() => (isRefreshConflictsOpen = false)}
 	/>
 	<ShareModal
+		name="topology-share"
 		isOpen={isShareModalOpen}
 		topologyId={currentTopology.id}
 		networkId={currentTopology.network_id}

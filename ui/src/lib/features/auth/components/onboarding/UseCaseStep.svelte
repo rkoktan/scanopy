@@ -339,6 +339,7 @@
 							<div class="flex-1">
 								<p class="text-sm font-medium text-warning">{onboarding_commercialNoticeTitle()}</p>
 								<p class="mt-1 text-sm text-warning">
+									<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted: i18n content with HTML links -->
 									{@html onboarding_commercialNoticeBody()}
 								</p>
 								<button type="button" class="btn-primary mt-4" onclick={handleLicenseAcknowledge}>

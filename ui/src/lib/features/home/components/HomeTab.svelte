@@ -1,0 +1,97 @@
+<script lang="ts">
+	import Loading from '$lib/shared/components/feedback/Loading.svelte';
+	import { useDashboardQuery } from '$lib/features/home/queries';
+	import { useOrganizationQuery } from '$lib/features/organizations/queries';
+	import { useCurrentUserQuery } from '$lib/features/auth/queries';
+	import GettingStartedChecklist from './GettingStartedChecklist.svelte';
+	import NetworkMetrics from './NetworkMetrics.svelte';
+	import DaemonHealthPanel from './DaemonHealthPanel.svelte';
+	import RecentDiscoveries from './RecentDiscoveries.svelte';
+	import FeatureNudges from './FeatureNudges.svelte';
+	import PlanUsage from './PlanUsage.svelte';
+	import type { TabProps } from '$lib/shared/types';
+	import type { components } from '$lib/api/schema';
+	import { onMount } from 'svelte';
+
+	type TelemetryOperation = components['schemas']['TelemetryOperation'];
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	let { isReadOnly = false }: TabProps = $props();
+
+	const dashboardQuery = useDashboardQuery();
+	const organizationQuery = useOrganizationQuery();
+	const currentUserQuery = useCurrentUserQuery();
+
+	let dashboard = $derived(dashboardQuery.data);
+	let organization = $derived(organizationQuery.data);
+	let currentUser = $derived(currentUserQuery.data);
+
+	let onboarding = $derived((organization?.onboarding ?? []) as TelemetryOperation[]);
+	let isOwner = $derived(currentUser?.permissions === 'Owner');
+
+	// Checklist dismiss state
+	let checklistDismissed = $state(false);
+	onMount(() => {
+		checklistDismissed = localStorage.getItem('home-checklist-dismissed') === 'true';
+	});
+
+	// Journey stage derivation
+	const has = (op: TelemetryOperation) => onboarding.includes(op);
+	let hasDaemon = $derived(has('FirstDaemonRegistered'));
+	let hasDiscovery = $derived(has('FirstDiscoveryCompleted'));
+	let hasTopology = $derived(has('FirstTopologyRebuild'));
+	let checklistComplete = $derived(hasDaemon && hasDiscovery && hasTopology);
+	let showNudges = $derived(
+		(checklistComplete || checklistDismissed) && dashboard != null && organization != null
+	);
+
+	// Navigation handler — sets the active tab via the URL hash
+	function navigateTo(tab: string) {
+		if (typeof window !== 'undefined') {
+			window.location.hash = tab;
+		}
+	}
+</script>
+
+<div class="space-y-6">
+	<div>
+		<h1 class="text-primary text-2xl font-bold">Home</h1>
+		<p class="text-tertiary mt-1 text-sm">
+			{#if organization}
+				{organization.name}
+			{/if}
+		</p>
+	</div>
+
+	{#if dashboardQuery.isPending || organizationQuery.isPending}
+		<Loading />
+	{:else if dashboard && organization}
+		<!-- Getting Started Checklist -->
+		{#if !checklistComplete || !checklistDismissed}
+			<GettingStartedChecklist {onboarding} onNavigate={navigateTo} />
+		{/if}
+
+		<!-- Feature Nudges — shown after checklist is complete/dismissed -->
+		{#if showNudges}
+			<FeatureNudges {organization} {dashboard} onNavigate={navigateTo} />
+		{/if}
+
+		<!-- Daemon Health — shown when daemons exist -->
+		{#if dashboard.daemons.length > 0}
+			<DaemonHealthPanel daemons={dashboard.daemons} onNavigate={navigateTo} />
+		{/if}
+
+		<!-- Recent Discoveries — shown when discoveries exist -->
+		{#if dashboard.recent_discoveries.length > 0}
+			<RecentDiscoveries discoveries={dashboard.recent_discoveries} />
+		{/if}
+
+		<!-- Plan Usage — always visible if limits are approaching -->
+		<PlanUsage planUsage={dashboard.plan_usage} plan={organization.plan} {isOwner} />
+
+		<!-- Network Metrics — last since large plans can have many networks -->
+		{#if dashboard.networks.length > 0}
+			<NetworkMetrics networks={dashboard.networks} />
+		{/if}
+	{/if}
+</div>

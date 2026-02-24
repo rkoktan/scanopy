@@ -154,6 +154,24 @@ impl DaemonService {
         }
     }
 
+    /// Logs a warning if a daemon URL uses HTTP (credentials sent in plaintext).
+    /// Does not block — users may have legitimate reasons (VPN, private network).
+    fn warn_if_insecure_daemon_url(url: &str) {
+        if let Ok(parsed) = url::Url::parse(url)
+            && parsed.scheme() != "https"
+            && let Some(host) = parsed.host_str()
+            && host != "localhost"
+            && host != "127.0.0.1"
+            && host != "::1"
+        {
+            tracing::warn!(
+                daemon_url = url,
+                "Daemon URL uses HTTP — credentials will be sent unencrypted. \
+                 Ensure the connection is secured through other means (e.g., VPN, private network)"
+            );
+        }
+    }
+
     // ========================================================================
     // Dependency injection (for breaking circular dependency with HostService)
     // ========================================================================
@@ -350,6 +368,8 @@ impl DaemonService {
         api_key: Option<&str>,
         request: DaemonDiscoveryRequest,
     ) -> Result<(), Error> {
+        Self::warn_if_insecure_daemon_url(&daemon.base.url);
+
         tracing::info!(
             daemon_id = %daemon.id,
             session_id = %request.session_id,
@@ -1132,6 +1152,8 @@ impl DaemonService {
     /// /api/discovery/entities-created). Legacy daemons stay alive via their
     /// own heartbeat calls to the server's backward-compat endpoint.
     async fn poll_daemon(&self, daemon: &Daemon) -> Result<()> {
+        Self::warn_if_insecure_daemon_url(&daemon.base.url);
+
         // Skip polling for legacy daemons - they don't have the new endpoints
         if !daemon.supports_full_server_poll() {
             tracing::debug!(

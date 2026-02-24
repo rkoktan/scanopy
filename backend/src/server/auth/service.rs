@@ -1,4 +1,5 @@
 use crate::server::shared::events::types::TelemetryOperation;
+use crate::server::shared::types::metadata::TypeMetadataProvider;
 use crate::server::{
     auth::{
         r#impl::{
@@ -33,8 +34,10 @@ use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
+use base64ct::{Base64UrlUnpadded, Encoding};
 use chrono::{Duration, Utc};
 use email_address::EmailAddress;
+use rand::RngCore;
 use std::{collections::HashMap, net::IpAddr, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -57,6 +60,13 @@ impl AuthService {
     const VERIFICATION_TOKEN_EXPIRY_HOURS: i64 = 24;
     const PASSWORD_RESET_TOKEN_EXPIRY_HOURS: i64 = 1;
     const RESEND_COOLDOWN_SECS: u64 = 60;
+
+    /// Generate a 256-bit CSPRNG token encoded as base64url (no padding).
+    fn generate_secure_token() -> String {
+        let mut bytes = [0u8; 32];
+        rand::rng().fill_bytes(&mut bytes);
+        Base64UrlUnpadded::encode_string(&bytes)
+    }
 
     pub fn new(
         user_service: Arc<UserService>,
@@ -217,6 +227,8 @@ impl AuthService {
         } = params;
 
         let mut is_new_org = false;
+        // Plan type at org creation time, used for PostHog identify on OrgCreated
+        let mut new_org_plan_type: Option<String> = None;
 
         // If being invited, use provided org ID, otherwise create a new one
         let organization_id = if let Some(org_id) = org_id {
@@ -247,6 +259,7 @@ impl AuthService {
                     None,
                 )
             };
+            new_org_plan_type = plan.as_ref().map(|p| p.name().to_string());
 
             // Create new organization for this user
             let organization = self
@@ -332,7 +345,10 @@ impl AuthService {
 
             let mut metadata = serde_json::json!({
                 "org_name": org_name,
-                "marketing_opt_in": marketing_opt_in
+                "marketing_opt_in": marketing_opt_in,
+                "plan_type": &new_org_plan_type,
+                "plan_status": serde_json::Value::Null,
+                "has_payment_method": false
             });
             if let Some(use_case) = use_case {
                 metadata["use_case"] = serde_json::json!(use_case);
@@ -587,7 +603,7 @@ impl AuthService {
             .await?;
 
         // Generate token and store in database
-        let token = Uuid::new_v4().to_string();
+        let token = Self::generate_secure_token();
         let expires = Utc::now() + Duration::hours(Self::PASSWORD_RESET_TOKEN_EXPIRY_HOURS);
         user.base.password_reset_token = Some(token.clone());
         user.base.password_reset_expires = Some(expires);
@@ -695,7 +711,7 @@ impl AuthService {
             .ok_or_else(|| anyhow!("Email service not configured"))?;
 
         // Generate token and expiry
-        let token = Uuid::new_v4().to_string();
+        let token = Self::generate_secure_token();
         let expires = Utc::now() + Duration::hours(Self::VERIFICATION_TOKEN_EXPIRY_HOURS);
 
         // Store token in user record
@@ -764,7 +780,7 @@ impl AuthService {
         }
 
         // Generate token + expiry (reuse verification token fields)
-        let token = Uuid::new_v4().to_string();
+        let token = Self::generate_secure_token();
         let expires = Utc::now() + Duration::hours(Self::VERIFICATION_TOKEN_EXPIRY_HOURS);
 
         user.base.pending_email = Some(new_email.clone());

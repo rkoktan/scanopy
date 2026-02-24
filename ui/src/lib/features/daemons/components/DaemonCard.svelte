@@ -10,6 +10,7 @@
 	import { formatTimestamp } from '$lib/shared/utils/formatting';
 	import { toColor } from '$lib/shared/utils/styling';
 	import { ArrowBigUp, RefreshCw, Trash2 } from 'lucide-svelte';
+	import { getDaemonStatusTag } from '$lib/features/daemons/utils';
 	import { useNetworksQuery } from '$lib/features/networks/queries';
 	import { useHostsQuery } from '$lib/features/hosts/queries';
 	import { useSubnetsQuery } from '$lib/features/subnets/queries';
@@ -57,21 +58,7 @@
 		daemon.api_key_id ? apiKeysData.find((k) => k.id === daemon.api_key_id) : null
 	);
 
-	// Compute status tag based on version_status and reachability
-	let status: TagProps | null = $derived.by(() => {
-		// Unreachable takes priority - it's a critical status
-		if (daemon.is_unreachable === true) {
-			return { label: 'Unreachable', color: toColor('red') };
-		}
-		switch (daemon.version_status.status) {
-			case 'Deprecated':
-				return { label: 'Deprecated', color: toColor('red') };
-			case 'Outdated':
-				return { label: 'Outdated', color: toColor('yellow') };
-			default:
-				return null;
-		}
-	});
+	let status: TagProps = $derived(getDaemonStatusTag(daemon));
 
 	let hasUpdateAvailable = $derived(
 		daemon.version_status.status === 'Outdated' || daemon.version_status.status === 'Deprecated'
