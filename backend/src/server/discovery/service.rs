@@ -1,3 +1,4 @@
+use crate::bail_validation;
 use crate::daemon::discovery::types::base::DiscoveryPhase;
 use crate::daemon::runtime::service::LOG_TARGET;
 use crate::server::auth::middleware::auth::AuthenticatedEntity;
@@ -207,13 +208,12 @@ impl DiscoveryService {
         if let RunType::Scheduled {
             timezone: Some(tz), ..
         } = run_type
+            && tz.parse::<chrono_tz::Tz>().is_err()
         {
-            tz.parse::<chrono_tz::Tz>().map_err(|_| {
-                anyhow!(
-                    "Invalid timezone '{}'. Use an IANA timezone like 'America/New_York'.",
-                    tz
-                )
-            })?;
+            bail_validation!(
+                "Invalid timezone '{}'. Use an IANA timezone like 'America/New_York'.",
+                tz
+            );
         }
         Ok(())
     }

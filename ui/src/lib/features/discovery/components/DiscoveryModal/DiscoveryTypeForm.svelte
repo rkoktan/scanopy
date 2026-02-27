@@ -251,32 +251,36 @@
 	}
 
 	// Toggle day-of-week selection
-	function toggleDay(dayIndex: number) {
+	function toggleDay(field: AnyFieldApi, dayIndex: number) {
 		if (readOnly) return;
-		const currentStr: string = form.state.values.schedule_days_of_week ?? '0,1,2,3,4,5,6';
-		const current = currentStr
+		const current = ((field.state.value as string) ?? '0,1,2,3,4,5,6')
 			.split(',')
 			.filter(Boolean)
-			.map((d) => parseInt(d));
+			.map(Number);
 		let updated: number[];
 		if (current.includes(dayIndex)) {
-			// Don't allow deselecting all days
 			if (current.length <= 1) return;
 			updated = current.filter((d) => d !== dayIndex);
 		} else {
 			updated = [...current, dayIndex].sort((a, b) => a - b);
 		}
-		const newValue = updated.join(',');
-		// Update form field programmatically — find the field and update
-		form.setFieldValue('schedule_days_of_week', newValue);
-		// Also update cron immediately
+		field.handleChange(updated.join(','));
 		if (formData.run_type.type !== 'Scheduled') return;
 		const time: string = form.state.values.schedule_time ?? '00:00';
-		const [hour, minute] = time.split(':').map((n) => parseInt(n));
+		const [hour, minute] = time.split(':').map((n: string) => parseInt(n));
 		formData.run_type = {
 			...formData.run_type,
 			cron_schedule: generateDayTimeCronSchedule(updated, hour || 0, minute || 0)
 		};
+	}
+
+	// Helper to check if a day is selected
+	function isDaySelected(field: AnyFieldApi, dayIndex: number): boolean {
+		return ((field.state.value as string) ?? '0,1,2,3,4,5,6')
+			.split(',')
+			.filter(Boolean)
+			.map(Number)
+			.includes(dayIndex);
 	}
 
 	// Switch to raw cron mode
@@ -368,17 +372,6 @@
 			};
 		}
 	}
-
-	// Selected days as a set for UI rendering
-	let selectedDays = $derived.by(() => {
-		const daysStr: string = form.state.values.schedule_days_of_week ?? '0,1,2,3,4,5,6';
-		return new Set(
-			daysStr
-				.split(',')
-				.filter(Boolean)
-				.map((d) => parseInt(d))
-		);
-	});
 </script>
 
 <div class="space-y-6">
@@ -552,25 +545,29 @@
 					</button>
 				{:else}
 					<!-- Day Picker Mode -->
-					<div>
-						<label class="text-secondary mb-2 block text-sm font-medium">
-							{discovery_scheduleDaysOfWeek()}
-						</label>
-						<div class="flex gap-1">
-							{#each [1, 2, 3, 4, 5, 6, 0] as dayIndex (dayIndex)}
-								<button
-									type="button"
-									class="{selectedDays.has(dayIndex)
-										? 'btn-info'
-										: 'btn-secondary'} px-3 py-1.5 text-sm"
-									disabled={readOnly}
-									onclick={() => toggleDay(dayIndex)}
-								>
-									{dayLabels[dayIndex]()}
-								</button>
-							{/each}
-						</div>
-					</div>
+					<form.Field name="schedule_days_of_week">
+						{#snippet children(field: AnyFieldApi)}
+							<div>
+								<label class="text-secondary mb-2 block text-sm font-medium">
+									{discovery_scheduleDaysOfWeek()}
+								</label>
+								<div class="flex gap-1">
+									{#each [1, 2, 3, 4, 5, 6, 0] as dayIndex (dayIndex)}
+										<button
+											type="button"
+											class="{isDaySelected(field, dayIndex)
+												? 'btn-info'
+												: 'btn-secondary'} px-3 py-1.5 text-sm"
+											disabled={readOnly}
+											onclick={() => toggleDay(field, dayIndex)}
+										>
+											{dayLabels[dayIndex]()}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/snippet}
+					</form.Field>
 
 					<form.Field
 						name="schedule_time"
