@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CodeContainer from '$lib/shared/components/data/CodeContainer.svelte';
+	import DocsHint from '$lib/shared/components/feedback/DocsHint.svelte';
 	import InlineInfo from '$lib/shared/components/feedback/InlineInfo.svelte';
 	import GenericModal from '$lib/shared/components/layout/GenericModal.svelte';
 	import ModalHeaderIcon from '$lib/shared/components/layout/ModalHeaderIcon.svelte';
@@ -24,9 +25,10 @@
 		daemons_upgradeConfigPreserved,
 		daemons_upgradeDownload,
 		daemons_upgradeDaemon,
+		daemons_docsMultipleDaemons,
+		daemons_docsMultipleDaemonsLinkText,
 		daemons_upgradeMultipleDaemons,
 		daemons_upgradeMultipleDaemonsBody,
-		daemons_upgradeMultipleDaemonsLearnMore,
 		daemons_upgradeStartProcess,
 		daemons_upgradeStopProcess
 	} from '$lib/paraglide/messages';
@@ -117,10 +119,8 @@ docker compose up -d`;
 									<b>{common_stepNumber({ number: '3' })}</b>
 									{daemons_upgradeStartProcess()}
 								</div>
-								<CodeContainer language="bash" expandable={false} code={startCommand} />
-
-								<details class="text-secondary text-sm">
-									<summary class="cursor-pointer font-medium hover:text-blue-400"
+								<details class="text-tertiary text-sm">
+									<summary class="cursor-pointer hover:text-blue-400"
 										>{daemons_upgradeMultipleDaemons()}</summary
 									>
 									<div class="mt-2 space-y-2">
@@ -130,16 +130,14 @@ docker compose up -d`;
 											expandable={false}
 											code={linuxConfigListCommand}
 										/>
-										<a
+										<DocsHint
+											text={daemons_docsMultipleDaemons()}
 											href="https://scanopy.net/docs/multiple-daemons/"
-											target="_blank"
-											rel="external noopener noreferrer"
-											class="text-info hover:underline"
-										>
-											{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
-										</a>
+											linkText={daemons_docsMultipleDaemonsLinkText()}
+										/>
 									</div>
 								</details>
+								<CodeContainer language="bash" expandable={false} code={startCommand} />
 							</div>
 						{:else if linuxMethod === 'docker'}
 							<!-- Linux Docker Compose -->
@@ -184,25 +182,21 @@ docker compose up -d`;
 								<b>{common_stepNumber({ number: '3' })}</b>
 								{daemons_upgradeStartProcess()}
 							</div>
-							<CodeContainer language="bash" expandable={false} code={startCommand} />
-
-							<details class="text-secondary text-sm">
-								<summary class="cursor-pointer font-medium hover:text-blue-400"
+							<details class="text-tertiary text-sm">
+								<summary class="cursor-pointer hover:text-blue-400"
 									>{daemons_upgradeMultipleDaemons()}</summary
 								>
 								<div class="mt-2 space-y-2">
 									<p>{daemons_upgradeMultipleDaemonsBody()}</p>
 									<CodeContainer language="bash" expandable={false} code={macosConfigListCommand} />
-									<a
+									<DocsHint
+										text={daemons_docsMultipleDaemons()}
 										href="https://scanopy.net/docs/multiple-daemons/"
-										target="_blank"
-										rel="external noopener noreferrer"
-										class="text-info hover:underline"
-									>
-										{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
-									</a>
+										linkText={daemons_docsMultipleDaemonsLinkText()}
+									/>
 								</div>
 							</details>
+							<CodeContainer language="bash" expandable={false} code={startCommand} />
 
 							<InlineInfo title={daemons_dockerLinuxOnly()} body={daemons_dockerLinuxOnlyBody()} />
 						</div>
@@ -227,10 +221,8 @@ docker compose up -d`;
 								<b>{common_stepNumber({ number: '3' })}</b>
 								{daemons_upgradeStartProcess()}
 							</div>
-							<CodeContainer language="powershell" expandable={false} code={windowsStartCommand} />
-
-							<details class="text-secondary text-sm">
-								<summary class="cursor-pointer font-medium hover:text-blue-400"
+							<details class="text-tertiary text-sm">
+								<summary class="cursor-pointer hover:text-blue-400"
 									>{daemons_upgradeMultipleDaemons()}</summary
 								>
 								<div class="mt-2 space-y-2">
@@ -240,16 +232,14 @@ docker compose up -d`;
 										expandable={false}
 										code={windowsConfigListCommand}
 									/>
-									<a
+									<DocsHint
+										text={daemons_docsMultipleDaemons()}
 										href="https://scanopy.net/docs/multiple-daemons/"
-										target="_blank"
-										rel="external noopener noreferrer"
-										class="text-info hover:underline"
-									>
-										{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
-									</a>
+										linkText={daemons_docsMultipleDaemonsLinkText()}
+									/>
 								</div>
 							</details>
+							<CodeContainer language="powershell" expandable={false} code={windowsStartCommand} />
 
 							<InlineInfo title={daemons_dockerLinuxOnly()} body={daemons_dockerLinuxOnlyBody()} />
 						</div>
