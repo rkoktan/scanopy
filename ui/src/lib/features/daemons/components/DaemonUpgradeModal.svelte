@@ -4,7 +4,7 @@
 	import GenericModal from '$lib/shared/components/layout/GenericModal.svelte';
 	import ModalHeaderIcon from '$lib/shared/components/layout/ModalHeaderIcon.svelte';
 	import { entities } from '$lib/shared/stores/metadata';
-	import { ArrowBigUpDash } from 'lucide-svelte';
+	import { ArrowBigUpDash, ExternalLink } from 'lucide-svelte';
 	import type { Daemon } from '../types/base';
 	import { VERSION } from '$lib/version';
 	import { type DaemonOS, detectOS } from '../utils';
@@ -117,10 +117,8 @@ docker compose up -d`;
 									<b>{common_stepNumber({ number: '3' })}</b>
 									{daemons_upgradeStartProcess()}
 								</div>
-								<CodeContainer language="bash" expandable={false} code={startCommand} />
-
-								<details class="text-secondary text-sm">
-									<summary class="cursor-pointer font-medium hover:text-blue-400"
+								<details class="text-tertiary text-sm">
+									<summary class="cursor-pointer hover:text-blue-400"
 										>{daemons_upgradeMultipleDaemons()}</summary
 									>
 									<div class="mt-2 space-y-2">
@@ -134,12 +132,14 @@ docker compose up -d`;
 											href="https://scanopy.net/docs/multiple-daemons/"
 											target="_blank"
 											rel="external noopener noreferrer"
-											class="text-info hover:underline"
+											class="text-info flex items-center gap-1 hover:underline"
 										>
-											{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
+											{daemons_upgradeMultipleDaemonsLearnMore()}
+											<ExternalLink class="h-3 w-3" />
 										</a>
 									</div>
 								</details>
+								<CodeContainer language="bash" expandable={false} code={startCommand} />
 							</div>
 						{:else if linuxMethod === 'docker'}
 							<!-- Linux Docker Compose -->
@@ -184,10 +184,8 @@ docker compose up -d`;
 								<b>{common_stepNumber({ number: '3' })}</b>
 								{daemons_upgradeStartProcess()}
 							</div>
-							<CodeContainer language="bash" expandable={false} code={startCommand} />
-
-							<details class="text-secondary text-sm">
-								<summary class="cursor-pointer font-medium hover:text-blue-400"
+							<details class="text-tertiary text-sm">
+								<summary class="cursor-pointer hover:text-blue-400"
 									>{daemons_upgradeMultipleDaemons()}</summary
 								>
 								<div class="mt-2 space-y-2">
@@ -197,12 +195,14 @@ docker compose up -d`;
 										href="https://scanopy.net/docs/multiple-daemons/"
 										target="_blank"
 										rel="external noopener noreferrer"
-										class="text-info hover:underline"
+										class="text-info flex items-center gap-1 hover:underline"
 									>
-										{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
+										{daemons_upgradeMultipleDaemonsLearnMore()}
+										<ExternalLink class="h-3 w-3" />
 									</a>
 								</div>
 							</details>
+							<CodeContainer language="bash" expandable={false} code={startCommand} />
 
 							<InlineInfo title={daemons_dockerLinuxOnly()} body={daemons_dockerLinuxOnlyBody()} />
 						</div>
@@ -227,10 +227,8 @@ docker compose up -d`;
 								<b>{common_stepNumber({ number: '3' })}</b>
 								{daemons_upgradeStartProcess()}
 							</div>
-							<CodeContainer language="powershell" expandable={false} code={windowsStartCommand} />
-
-							<details class="text-secondary text-sm">
-								<summary class="cursor-pointer font-medium hover:text-blue-400"
+							<details class="text-tertiary text-sm">
+								<summary class="cursor-pointer hover:text-blue-400"
 									>{daemons_upgradeMultipleDaemons()}</summary
 								>
 								<div class="mt-2 space-y-2">
@@ -244,12 +242,14 @@ docker compose up -d`;
 										href="https://scanopy.net/docs/multiple-daemons/"
 										target="_blank"
 										rel="external noopener noreferrer"
-										class="text-info hover:underline"
+										class="text-info flex items-center gap-1 hover:underline"
 									>
-										{daemons_upgradeMultipleDaemonsLearnMore()} &rarr;
+										{daemons_upgradeMultipleDaemonsLearnMore()}
+										<ExternalLink class="h-3 w-3" />
 									</a>
 								</div>
 							</details>
+							<CodeContainer language="powershell" expandable={false} code={windowsStartCommand} />
 
 							<InlineInfo title={daemons_dockerLinuxOnly()} body={daemons_dockerLinuxOnlyBody()} />
 						</div>
