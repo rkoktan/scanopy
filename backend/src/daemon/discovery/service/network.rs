@@ -969,7 +969,7 @@ impl DiscoveryRunner<NetworkScanDiscovery> {
         // SNMP polling - gather system info, interface table, and neighbor discovery
         // Only attempt if UDP 161 is open (saves time on hosts without SNMP)
         let snmp_port_open = open_ports.contains(&PortType::Snmp);
-        let (snmp_system_info, snmp_if_entries, lldp_neighbors, cdp_neighbors) =
+        let (snmp_system_info, snmp_if_entries, lldp_neighbors, cdp_neighbors, ip_addr_table) =
             if let Some(credential) = &snmp_credential
                 && snmp_port_open
             {
@@ -1029,15 +1029,20 @@ impl DiscoveryRunner<NetworkScanDiscovery> {
                             }
                         };
 
-                        (Some(system_info), if_entries, lldp, cdp)
+                        // Query ipAddrTable for IP→ifIndex mappings
+                        let ip_addr_table = snmp::query_ip_addr_table(ip, credential)
+                            .await
+                            .unwrap_or_default();
+
+                        (Some(system_info), if_entries, lldp, cdp, ip_addr_table)
                     }
                     Err(e) => {
                         tracing::debug!(ip = %ip, error = %e, "SNMP query failed");
-                        (None, Vec::new(), Vec::new(), Vec::new())
+                        (None, Vec::new(), Vec::new(), Vec::new(), Default::default())
                     }
                 }
             } else {
-                (None, Vec::new(), Vec::new(), Vec::new())
+                (None, Vec::new(), Vec::new(), Vec::new(), Default::default())
             };
 
         tracing::info!(
@@ -1056,13 +1061,23 @@ impl DiscoveryRunner<NetworkScanDiscovery> {
                 .and_then(|info| info.sys_name.clone())
         });
 
+        // Enrich MAC from SNMP ipAddrTable when ARP didn't provide one.
+        // ipAddrTable maps IP→ifIndex, and ifTable has ifIndex→MAC (ifPhysAddress).
+        let mac = mac.or_else(|| {
+            let if_index = ip_addr_table.get(&ip)?;
+            snmp_if_entries
+                .iter()
+                .find(|e| e.if_index == *if_index)?
+                .if_phys_address
+        });
+
         let interface = Interface::new(InterfaceBase {
             network_id: subnet.base.network_id,
             host_id: Uuid::nil(), // Placeholder - server will set correct host_id
             name: None,
             subnet_id: subnet.id,
             ip_address: ip,
-            mac_address: mac, // MAC populated from ARP discovery
+            mac_address: mac,
             position: 0,
         });
 

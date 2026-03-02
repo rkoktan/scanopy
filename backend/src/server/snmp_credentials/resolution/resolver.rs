@@ -76,15 +76,20 @@ impl LldpResolverImpl {
 #[async_trait]
 impl LldpResolver for LldpResolverImpl {
     async fn find_host_by_mac(&self, mac: &str, network_id: Uuid) -> Option<Uuid> {
-        // Parse MAC string to MacAddress type
         let mac_addr: mac_address::MacAddress = mac.parse().ok()?;
 
-        // Find interface with this MAC in the network
+        // Primary: Interface MAC (populated from ARP or SNMP ipAddrTable enrichment)
         let filter =
             StorableFilter::<Interface>::new_from_network_ids(&[network_id]).mac_address(&mac_addr);
-        let interface = self.interface_service.get_one(filter).await.ok()??;
+        if let Ok(Some(interface)) = self.interface_service.get_one(filter).await {
+            return Some(interface.base.host_id);
+        }
 
-        Some(interface.base.host_id)
+        // Fallback: IfEntry MAC (from SNMP ifPhysAddress, always present for SNMP hosts)
+        let filter =
+            StorableFilter::<IfEntry>::new_from_network_ids(&[network_id]).mac_address(&mac_addr);
+        let entry = self.if_entry_service.get_one(filter).await.ok()??;
+        Some(entry.base.host_id)
     }
 
     async fn find_host_by_ip(&self, ip: &IpAddr, network_id: Uuid) -> Option<Uuid> {
