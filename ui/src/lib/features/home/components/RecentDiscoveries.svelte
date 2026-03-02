@@ -24,7 +24,7 @@
 	{#if discoveries.length === 0}
 		<p class="text-tertiary text-sm">No discovery results yet.</p>
 	{:else}
-		<div class="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-3">
+		<div class="grid grid-cols-[repeat(auto-fill,minmax(360px,1fr))] gap-4">
 			{#each discoveries as discovery (discovery.id)}
 				<button
 					class="card card-static cursor-pointer text-left"
