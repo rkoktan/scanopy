@@ -55,8 +55,8 @@ use crate::server::tags::entity_tags::EntityTagService;
 use crate::server::users::service::UserService;
 use axum::http::StatusCode;
 
-/// Daily midnight cron schedule for default discovery jobs
-const DAILY_MIDNIGHT_CRON: &str = "0 0 0 * * *";
+/// Weekly Sunday midnight cron schedule for default discovery jobs
+const WEEKLY_SUNDAY_MIDNIGHT_CRON: &str = "0 0 0 * * 0";
 
 /// Default polling interval in seconds
 const DEFAULT_POLL_INTERVAL_SECS: u64 = 30;
@@ -927,7 +927,7 @@ impl DaemonService {
             RunType::AdHoc { last_run: None }
         } else {
             RunType::Scheduled {
-                cron_schedule: DAILY_MIDNIGHT_CRON.to_string(),
+                cron_schedule: WEEKLY_SUNDAY_MIDNIGHT_CRON.to_string(),
                 last_run: None,
                 enabled: true,
                 timezone: None,

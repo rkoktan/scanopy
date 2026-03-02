@@ -216,10 +216,10 @@
 			discovery_type_type: 'Network' as 'Network' | 'Docker' | 'SelfReport',
 			host_naming_fallback: 'BestService' as 'BestService' | 'Ip',
 			probe_raw_socket_ports: false,
-			schedule_days_of_week: '0,1,2,3,4,5,6',
+			schedule_days_of_week: '0',
 			schedule_time: '00:00',
 			schedule_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-			schedule_cron: '0 0 0 * * *'
+			schedule_cron: '0 0 0 * * 0'
 		},
 		onSubmit: async ({ value }) => {
 			// Update formData with form values
@@ -251,9 +251,9 @@
 		formData = getDefaultFormData();
 
 		// Parse schedule fields from cron
-		let scheduleDaysOfWeek = '0,1,2,3,4,5,6';
+		let scheduleDaysOfWeek = '0';
 		let scheduleTime = '00:00';
-		let scheduleCron = '0 0 0 * * *';
+		let scheduleCron = '0 0 0 * * 0';
 		let scheduleTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 		if (formData.run_type.type === 'Scheduled') {
