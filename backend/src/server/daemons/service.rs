@@ -376,9 +376,9 @@ impl DaemonService {
             "Sending discovery request to daemon"
         );
 
-        // Use to_daemon_value() to serialize with SNMP credentials exposed.
+        // Use with_exposed_snmp() to serialize with SNMP credentials exposed.
         // The default Serialize impl redacts credentials via Secret<String>.
-        let payload = request.to_daemon_value();
+        let payload = request.with_exposed_snmp();
         let _: Option<serde_json::Value> = self
             .post_to_daemon(daemon, api_key, "/api/discovery/initiate", &payload)
             .await?;
