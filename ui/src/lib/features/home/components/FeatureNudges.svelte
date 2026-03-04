@@ -61,7 +61,7 @@
 					onNavigate('tags');
 					openModal('tag-editor');
 				},
-				visible: !has('FirstTagCreated'),
+				visible: has('FirstDiscoveryCompleted') && !has('FirstTagCreated'),
 				icon: entities.getIconComponent('Tag'),
 				iconColor: entities.getColorHelper('Tag').icon
 			},
@@ -125,7 +125,7 @@
 					onNavigate('api-keys');
 					openModal('user-api-key');
 				},
-				visible: isProPlus && !has('FirstUserApiKeyCreated'),
+				visible: isProPlus && has('FirstDiscoveryCompleted') && !has('FirstUserApiKeyCreated'),
 				icon: entities.getIconComponent('UserApiKey'),
 				iconColor: entities.getColorHelper('UserApiKey').icon
 			},
@@ -151,7 +151,7 @@
 					onNavigate('topology');
 					openModal('topology-share');
 				},
-				visible: isProPlus,
+				visible: isProPlus && has('FirstTopologyRebuild'),
 				icon: entities.getIconComponent('Share'),
 				iconColor: entities.getColorHelper('Share').icon
 			},

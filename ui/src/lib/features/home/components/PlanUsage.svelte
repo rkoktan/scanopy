@@ -62,7 +62,9 @@
 		return list;
 	});
 
-	let showUpgrade = $derived(hasLimits && isOwner && rows.some((r) => r.pct >= 1 && !r.hasOverage));
+	let showUpgrade = $derived(
+		hasLimits && isOwner && rows.some((r) => r.pct >= 0.8 && !r.hasOverage)
+	);
 
 	function barColor(row: UsageRow): string {
 		if (row.hasOverage) return 'bg-blue-500';

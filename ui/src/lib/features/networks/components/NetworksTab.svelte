@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TabHeader from '$lib/shared/components/layout/TabHeader.svelte';
+	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import Loading from '$lib/shared/components/feedback/Loading.svelte';
 	import EmptyState from '$lib/shared/components/layout/EmptyState.svelte';
 	import type { Network } from '../types';
@@ -69,6 +70,9 @@
 	let isLoading = $derived(networksQuery.isPending);
 	let isAtNetworkLimit = $derived(
 		networkLimit !== null && networksData.length >= networkLimit && !canBuyMore
+	);
+	let isNearNetworkLimit = $derived(
+		networkLimit !== null && networksData.length >= networkLimit - 2 && !isAtNetworkLimit
 	);
 
 	let showCreateNetworkModal = $state(false);
@@ -211,6 +215,13 @@
 			</div>
 		</svelte:fragment>
 	</TabHeader>
+
+	{#if isNearNetworkLimit}
+		<InlineWarning
+			title="You're approaching your network limit ({networksData.length}/{networkLimit}). Upgrade for more networks."
+			dismissableKey="network-limit-warning"
+		/>
+	{/if}
 
 	<!-- Loading state -->
 	{#if isLoading}
