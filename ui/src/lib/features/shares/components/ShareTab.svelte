@@ -15,7 +15,7 @@
 	import UpgradeButton from '$lib/shared/components/UpgradeButton.svelte';
 	import type { TabProps } from '$lib/shared/types';
 	import { downloadCsv } from '$lib/shared/utils/csvExport';
-	import { modalState } from '$lib/shared/stores/modal-registry';
+	import { modalState, resolveModalDeepLink } from '$lib/shared/stores/modal-registry';
 	import {
 		common_confirmDeleteName,
 		common_created,
@@ -61,24 +61,16 @@
 
 	// Deep-link: open share editor from URL (handles both fresh open and entity switch)
 	$effect(() => {
-		if ($modalState.name === 'share-editor') {
-			if (!showEditor) {
-				if ($modalState.id) {
-					const share = sharesData.find((e) => e.id === $modalState.id);
-					if (share) {
-						editingShare = share;
-						showEditor = true;
-					}
-				} else {
-					editingShare = null;
-					showEditor = true;
-				}
-			} else if ($modalState.id && $modalState.id !== editingShare?.id) {
-				const share = sharesData.find((e) => e.id === $modalState.id);
-				if (share) {
-					editingShare = share;
-				}
-			}
+		const result = resolveModalDeepLink(
+			$modalState,
+			'share-editor',
+			sharesData,
+			showEditor,
+			editingShare?.id
+		);
+		if (result !== undefined) {
+			editingShare = result;
+			showEditor = true;
 		}
 	});
 

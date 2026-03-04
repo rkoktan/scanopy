@@ -18,7 +18,7 @@
 	import { useCurrentUserQuery } from '$lib/features/auth/queries';
 	import { useOrganizationQuery } from '$lib/features/organizations/queries';
 	import { permissions } from '$lib/shared/stores/metadata';
-	import { modalState } from '$lib/shared/stores/modal-registry';
+	import { modalState, resolveModalDeepLink } from '$lib/shared/stores/modal-registry';
 	import type { TabProps } from '$lib/shared/types';
 	import { downloadCsv } from '$lib/shared/utils/csvExport';
 	import type { components } from '$lib/api/schema';
@@ -45,24 +45,16 @@
 
 	// Deep-link: open SNMP credential editor from URL (handles both fresh open and entity switch)
 	$effect(() => {
-		if ($modalState.name === 'snmp-credential-editor') {
-			if (!showCredentialEditor) {
-				if ($modalState.id) {
-					const entity = credentials.find((e) => e.id === $modalState.id);
-					if (entity) {
-						editingCredential = entity;
-						showCredentialEditor = true;
-					}
-				} else {
-					editingCredential = null;
-					showCredentialEditor = true;
-				}
-			} else if ($modalState.id && $modalState.id !== editingCredential?.id) {
-				const entity = credentials.find((e) => e.id === $modalState.id);
-				if (entity) {
-					editingCredential = entity;
-				}
-			}
+		const result = resolveModalDeepLink(
+			$modalState,
+			'snmp-credential-editor',
+			credentials,
+			showCredentialEditor,
+			editingCredential?.id
+		);
+		if (result !== undefined) {
+			editingCredential = result;
+			showCredentialEditor = true;
 		}
 	});
 

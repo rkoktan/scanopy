@@ -23,7 +23,7 @@
 	import { useHostsQuery } from '$lib/features/hosts/queries';
 	import type { TabProps } from '$lib/shared/types';
 	import { downloadCsv } from '$lib/shared/utils/csvExport';
-	import { modalState } from '$lib/shared/stores/modal-registry';
+	import { modalState, resolveModalDeepLink } from '$lib/shared/stores/modal-registry';
 	import {
 		common_confirmDeleteName,
 		common_create,
@@ -67,24 +67,16 @@
 
 	// Deep-link: open discovery editor from URL (handles both fresh open and entity switch)
 	$effect(() => {
-		if ($modalState.name === 'discovery-editor') {
-			if (!showDiscoveryModal) {
-				if ($modalState.id) {
-					const entity = discoveriesData.find((e) => e.id === $modalState.id);
-					if (entity) {
-						editingDiscovery = entity;
-						showDiscoveryModal = true;
-					}
-				} else {
-					editingDiscovery = null;
-					showDiscoveryModal = true;
-				}
-			} else if ($modalState.id && $modalState.id !== editingDiscovery?.id) {
-				const entity = discoveriesData.find((e) => e.id === $modalState.id);
-				if (entity) {
-					editingDiscovery = entity;
-				}
-			}
+		const result = resolveModalDeepLink(
+			$modalState,
+			'discovery-editor',
+			discoveriesData,
+			showDiscoveryModal,
+			editingDiscovery?.id
+		);
+		if (result !== undefined) {
+			editingDiscovery = result;
+			showDiscoveryModal = true;
 		}
 	});
 
