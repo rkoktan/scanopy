@@ -3915,8 +3915,8 @@ fn generate_shares(
                 password_hash: None,
                 allowed_domains: None,
                 options: ShareOptions {
-                    show_inspect_panel: true,
-                    show_zoom_controls: true,
+                    show_inspect_panel: false,
+                    show_zoom_controls: false,
                     show_export_button: false,
                 },
             },

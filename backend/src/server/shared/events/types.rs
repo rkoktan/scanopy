@@ -581,7 +581,7 @@ pub enum AnalyticsOperation {
 
 impl AnalyticsOperation {
     fn log_level(&self) -> EventLogLevel {
-        EventLogLevel::Info
+        EventLogLevel::Debug
     }
 }
 

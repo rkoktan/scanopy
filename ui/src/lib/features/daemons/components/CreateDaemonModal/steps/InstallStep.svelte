@@ -33,9 +33,17 @@
 		runCommand: string;
 		dockerCompose: string;
 		hasErrors: boolean;
+		isFirstDaemon?: boolean;
 	}
 
-	let { selectedOS, onOsSelect, runCommand, dockerCompose, hasErrors }: Props = $props();
+	let {
+		selectedOS,
+		onOsSelect,
+		runCommand,
+		dockerCompose,
+		hasErrors,
+		isFirstDaemon = false
+	}: Props = $props();
 
 	const configQuery = useConfigQuery();
 	let hasEmail = $derived(configQuery.data?.has_email_service ?? false);
@@ -58,8 +66,11 @@
 	<!-- Hint about Advanced tab -->
 	<InlineInfo title="" body={daemons_advancedHint()} dismissableKey="daemon-wizard-advanced-hint" />
 
-	{#if hasEmail}
-		<InlineInfo title="We'll email you when your daemon connects and your network map is ready." />
+	{#if hasEmail && isFirstDaemon}
+		<InlineInfo
+			title="We'll email you when your daemon connects and your network map is ready."
+			dismissableKey="daemon-install-email-hint"
+		/>
 	{/if}
 
 	{#if hasErrors}

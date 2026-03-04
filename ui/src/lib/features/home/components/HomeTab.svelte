@@ -15,12 +15,10 @@
 	import { onMount } from 'svelte';
 	import { openModal } from '$lib/shared/stores/modal-registry';
 	import { useConfigQuery } from '$lib/shared/stores/config-query';
-	import { resolve } from '$app/paths';
-
 	type OnboardingOperation = components['schemas']['OnboardingOperation'];
 
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	let { isReadOnly = false }: TabProps = $props();
+	let { isReadOnly = false, isActive = false }: TabProps = $props();
 
 	const dashboardQuery = useDashboardQuery();
 	const organizationQuery = useOrganizationQuery();
@@ -47,6 +45,13 @@
 		demoTopologyDismissed = true;
 		localStorage.setItem('home-demo-topology-dismissed', 'true');
 	}
+
+	$effect(() => {
+		if (isActive) {
+			organizationQuery.refetch();
+			dashboardQuery.refetch();
+		}
+	});
 
 	// Journey stage derivation
 	const has = (op: OnboardingOperation) => onboarding.includes(op);
@@ -82,16 +87,14 @@
 		<ProfilePrompt {organization} {configData} />
 
 		<!-- Demo Topology Embed — shown before first topology rebuild -->
-		{#if !has('FirstTopologyRebuild') && !demoTopologyDismissed}
+		{#if !has('FirstDiscoveryCompleted') && !demoTopologyDismissed}
 			<section>
 				<div class="overflow-hidden rounded-lg border border-gray-700">
 					<div class="flex items-center justify-between px-4 pt-3">
-						<h3 class="text-primary text-base font-semibold">
-							See what your topology will look like
-						</h3>
+						<h3 class="text-primary text-base font-semibold">Preview: Shareable Network Map</h3>
 						<div class="flex items-center gap-3">
 							<a
-								href={resolve('/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890')}
+								href="https://demo.scanopy.net/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 								target="_blank"
 								rel="noopener noreferrer"
 								class="text-link text-sm hover:underline"
@@ -107,11 +110,12 @@
 						</div>
 					</div>
 					<p class="text-secondary px-4 pb-2 text-sm">
-						Once your daemon completes a discovery, your network will be visualized like this.
+						This is a live demo of Scanopy's topology view — a shareable, embeddable map you'll have
+						once your first scan completes.
 					</p>
 					<div class="h-[400px] w-full">
 						<iframe
-							src="/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890/embed"
+							src="https://demo.scanopy.net/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890/embed"
 							width="100%"
 							height="100%"
 							frameborder="0"
