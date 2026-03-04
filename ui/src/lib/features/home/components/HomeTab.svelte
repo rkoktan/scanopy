@@ -9,10 +9,12 @@
 	import RecentDiscoveries from './RecentDiscoveries.svelte';
 	import FeatureNudges from './FeatureNudges.svelte';
 	import PlanUsage from './PlanUsage.svelte';
+	import ProfilePrompt from './ProfilePrompt.svelte';
 	import type { TabProps } from '$lib/shared/types';
 	import type { components } from '$lib/api/schema';
 	import { onMount } from 'svelte';
 	import { openModal } from '$lib/shared/stores/modal-registry';
+	import { useConfigQuery } from '$lib/shared/stores/config-query';
 
 	type OnboardingOperation = components['schemas']['OnboardingOperation'];
 
@@ -22,6 +24,7 @@
 	const dashboardQuery = useDashboardQuery();
 	const organizationQuery = useOrganizationQuery();
 	const currentUserQuery = useCurrentUserQuery();
+	const configQuery = useConfigQuery();
 
 	let dashboard = $derived(dashboardQuery.data);
 	let organization = $derived(organizationQuery.data);
@@ -29,12 +32,20 @@
 
 	let onboarding = $derived((organization?.onboarding ?? []) as OnboardingOperation[]);
 	let isOwner = $derived(currentUser?.permissions === 'Owner');
+	let configData = $derived(configQuery.data);
 
 	// Checklist dismiss state
 	let checklistDismissed = $state(false);
+	let demoTopologyDismissed = $state(false);
 	onMount(() => {
 		checklistDismissed = localStorage.getItem('home-checklist-dismissed') === 'true';
+		demoTopologyDismissed = localStorage.getItem('home-demo-topology-dismissed') === 'true';
 	});
+
+	function dismissDemoTopology() {
+		demoTopologyDismissed = true;
+		localStorage.setItem('home-demo-topology-dismissed', 'true');
+	}
 
 	// Journey stage derivation
 	const has = (op: OnboardingOperation) => onboarding.includes(op);
@@ -70,6 +81,51 @@
 		<!-- Getting Started Checklist -->
 		{#if !checklistComplete && !checklistDismissed}
 			<GettingStartedChecklist {onboarding} onNavigate={navigateTo} />
+		{/if}
+
+		<!-- Profile Prompt — shown after discovery for company/msp cloud users -->
+		<ProfilePrompt {organization} {configData} />
+
+		<!-- Demo Topology Embed — shown before first topology rebuild -->
+		{#if !has('FirstTopologyRebuild') && !demoTopologyDismissed}
+			<section>
+				<div class="overflow-hidden rounded-lg border border-gray-700">
+					<div class="flex items-center justify-between px-4 pt-3">
+						<h3 class="text-primary text-base font-semibold">
+							See what your topology will look like
+						</h3>
+						<div class="flex items-center gap-3">
+							<a
+								href="https://demo.scanopy.net/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+								target="_blank"
+								rel="noopener noreferrer"
+								class="text-link text-sm hover:underline"
+							>
+								View full screen
+							</a>
+							<button
+								onclick={dismissDemoTopology}
+								class="text-tertiary hover:text-secondary text-sm"
+							>
+								Dismiss
+							</button>
+						</div>
+					</div>
+					<p class="text-secondary px-4 pb-2 text-sm">
+						Once your daemon completes a discovery, your network will be visualized like this.
+					</p>
+					<div class="h-[400px] w-full">
+						<iframe
+							src="https://demo.scanopy.net/share/a1b2c3d4-e5f6-7890-abcd-ef1234567890/embed"
+							width="100%"
+							height="100%"
+							frameborder="0"
+							style="border: none;"
+							title="Demo network topology"
+						></iframe>
+					</div>
+				</div>
+			</section>
 		{/if}
 
 		<!-- Feature Nudges — shown after checklist is complete/dismissed -->

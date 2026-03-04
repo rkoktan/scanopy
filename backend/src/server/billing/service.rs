@@ -1793,6 +1793,20 @@ impl BillingService {
             ))
             .await?;
 
+        if let Some(ref email_service) = self.email_service {
+            let owners = self
+                .user_service
+                .get_organization_owners(&organization.id)
+                .await?;
+            if let Some(owner) = owners.first()
+                && let Err(e) = email_service
+                    .send_payment_failed_email(owner.base.email.clone())
+                    .await
+            {
+                tracing::warn!(error = %e, "Failed to send payment failed email");
+            }
+        }
+
         Ok(())
     }
 
@@ -1820,6 +1834,20 @@ impl BillingService {
                 json!({ "org_id": organization.id.to_string() }),
             ))
             .await?;
+
+        if let Some(ref email_service) = self.email_service {
+            let owners = self
+                .user_service
+                .get_organization_owners(&organization.id)
+                .await?;
+            if let Some(owner) = owners.first()
+                && let Err(e) = email_service
+                    .send_payment_action_required_email(owner.base.email.clone())
+                    .await
+            {
+                tracing::warn!(error = %e, "Failed to send payment action required email");
+            }
+        }
 
         Ok(())
     }

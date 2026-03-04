@@ -170,7 +170,10 @@
 								<AlertTriangle class="h-5 w-5 text-amber-500" />
 								<div>
 									<p class="text-primary text-sm font-medium">
-										Trial ends in {trialDaysLeft} days
+										Trial ends in {trialDaysLeft} days ({trialEndDate?.toLocaleDateString(
+											undefined,
+											{ month: 'long', day: 'numeric', year: 'numeric' }
+										)})
 									</p>
 									<p class="text-secondary mt-1 text-xs">
 										Add a payment method to continue after the trial

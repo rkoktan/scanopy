@@ -179,7 +179,7 @@
 		planType={selectedPlan?.type ?? ''}
 		userEmail={currentUser?.email ?? ''}
 		orgName={organization?.name ?? ''}
-		companySize={$onboardingStore.companySize ?? ''}
+		companySize=""
 		onClose={() => (inquiryModalOpen = false)}
 	/>
 </GenericModal>

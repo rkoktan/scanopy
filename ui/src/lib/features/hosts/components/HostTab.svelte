@@ -6,6 +6,7 @@
 		UpdateHostWithServicesRequest
 	} from '../types/base';
 	import TabHeader from '$lib/shared/components/layout/TabHeader.svelte';
+	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import Loading from '$lib/shared/components/feedback/Loading.svelte';
 	import EmptyState from '$lib/shared/components/layout/EmptyState.svelte';
 	import HostEditor from './HostEditModal/HostEditor.svelte';
@@ -354,6 +355,13 @@
 			</div>
 		</svelte:fragment>
 	</TabHeader>
+
+	{#if isNearHostLimit}
+		<InlineWarning
+			title="You're approaching your host limit ({totalHostCount}/{hostLimit}). Upgrade for more hosts."
+			dismissableKey="host-limit-warning"
+		/>
+	{/if}
 
 	<!-- Loading state (only on initial load) -->
 	{#if isInitialLoading}

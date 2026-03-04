@@ -3,6 +3,7 @@
 	import DocsHint from '$lib/shared/components/feedback/DocsHint.svelte';
 	import InlineInfo from '$lib/shared/components/feedback/InlineInfo.svelte';
 	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
+	import { useConfigQuery } from '$lib/shared/stores/config-query';
 	import type { DaemonOS } from '../../../utils';
 	import { trackEvent } from '$lib/shared/utils/analytics';
 	import OsSelector from '../../OsSelector.svelte';
@@ -35,6 +36,9 @@
 	}
 
 	let { selectedOS, onOsSelect, runCommand, dockerCompose, hasErrors }: Props = $props();
+
+	const configQuery = useConfigQuery();
+	let hasEmail = $derived(configQuery.data?.has_email_service ?? false);
 
 	type LinuxMethod = 'binary' | 'docker';
 	let linuxMethod: LinuxMethod = $state('binary');
@@ -129,5 +133,10 @@
 				<InlineInfo title={daemons_dockerLinuxOnly()} body={daemons_dockerLinuxOnlyBody()} />
 			{/if}
 		</OsSelector>
+		{#if hasEmail}
+			<InlineInfo
+				title="We'll email you when your daemon connects and your network map is ready."
+			/>
+		{/if}
 	{/if}
 </div>

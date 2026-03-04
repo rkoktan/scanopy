@@ -54,7 +54,7 @@
 	let registering = $state(false);
 	let subStep = $state<'email' | 'password'>('email');
 	let emailValue = $state('');
-	let emailError = $state<'email_in_use' | null>(null);
+	let emailError = $state<'email_in_use' | 'generic' | null>(null);
 	let checkingEmail = $state(false);
 	let honeypotValue = $state('');
 
@@ -132,7 +132,7 @@
 			if (error.code === 'user_email_in_use') {
 				emailError = 'email_in_use';
 			} else {
-				emailError = 'email_in_use';
+				emailError = 'generic';
 			}
 		} finally {
 			checkingEmail = false;
@@ -232,6 +232,8 @@
 								{auth_signInInstead()}
 							</button>
 						{/if}
+					{:else if emailError === 'generic'}
+						<InlineDanger title="Something went wrong. Please try again." />
 					{/if}
 				</div>
 			{:else}
@@ -304,24 +306,7 @@
 								</div>
 							{/if}
 
-							<button
-								type="submit"
-								disabled={checkingEmail || (enableTermsCheckbox && !termsAccepted)}
-								class="btn-primary w-full"
-							>
-								{checkingEmail ? '...' : common_continue()}
-							</button>
-
 							{#if hasOidcProviders}
-								<div class="relative">
-									<div class="absolute inset-0 flex items-center">
-										<div class="w-full border-t border-gray-600"></div>
-									</div>
-									<div class="relative flex justify-center text-sm">
-										<span class="bg-gray-900 px-2 text-gray-400">{common_or()}</span>
-									</div>
-								</div>
-
 								<div class="space-y-2">
 									{#each oidcProviders as provider (provider.slug)}
 										<button
@@ -337,7 +322,24 @@
 										</button>
 									{/each}
 								</div>
+
+								<div class="relative">
+									<div class="absolute inset-0 flex items-center">
+										<div class="w-full border-t border-gray-600"></div>
+									</div>
+									<div class="relative flex justify-center text-sm">
+										<span class="bg-gray-900 px-2 text-gray-400">{common_or()}</span>
+									</div>
+								</div>
 							{/if}
+
+							<button
+								type="submit"
+								disabled={checkingEmail || (enableTermsCheckbox && !termsAccepted)}
+								class="btn-primary w-full"
+							>
+								{checkingEmail ? 'Checking...' : common_continue()}
+							</button>
 						{:else}
 							<!-- Password sub-step footer -->
 							<button type="submit" disabled={registering} class="btn-primary w-full">

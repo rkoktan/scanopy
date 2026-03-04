@@ -29,6 +29,7 @@
 		discovery_finishedAt,
 		discovery_historyTitle,
 		discovery_noHistorySessions,
+		discovery_noHistorySessionsSubtitle,
 		discovery_startedAt
 	} from '$lib/paraglide/messages';
 
@@ -162,7 +163,10 @@
 		<Loading />
 	{:else if discoveriesData.length === 0}
 		<!-- Empty state -->
-		<EmptyState title={discovery_noHistorySessions()} subtitle="" />
+		<EmptyState
+			title={discovery_noHistorySessions()}
+			subtitle={discovery_noHistorySessionsSubtitle()}
+		/>
 	{:else}
 		<DataControls
 			items={discoveriesData.filter((d) => d.run_type.type == 'Historical')}

@@ -459,6 +459,7 @@ pub enum OnboardingOperation {
     FirstSnmpCredentialCreated,
     InviteSent,
     InviteAccepted,
+    ProfileCompleted,
 }
 
 impl OnboardingOperation {

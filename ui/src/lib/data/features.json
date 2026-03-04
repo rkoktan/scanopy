@@ -7,8 +7,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Starter"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -19,8 +23,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Team"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -31,8 +39,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": true,
 			"minimum_plan": "Business"
+=======
+			"is_coming_soon": true
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -43,8 +55,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": true,
 			"minimum_plan": "Business"
+=======
+			"is_coming_soon": true
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -55,8 +71,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Starter"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -67,8 +87,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Pro"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -79,8 +103,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Enterprise"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -91,8 +119,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Enterprise"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -103,8 +135,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Enterprise"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -115,8 +151,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Free"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -127,8 +167,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Starter"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -139,8 +183,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Enterprise"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -151,8 +199,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Team"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -163,8 +215,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Pro"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -175,8 +231,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Starter"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -187,8 +247,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Starter"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -199,8 +263,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Free"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -211,8 +279,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Free"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -223,8 +295,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Free"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	},
 	{
@@ -235,8 +311,12 @@
 		"icon": "sparkle",
 		"color": "Gray",
 		"metadata": {
+<<<<<<< HEAD
 			"is_coming_soon": false,
 			"minimum_plan": "Free"
+=======
+			"is_coming_soon": false
+>>>>>>> audit/onboarding-cro
 		}
 	}
 ]
