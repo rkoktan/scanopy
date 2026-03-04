@@ -16,6 +16,7 @@
 	import { useSubnetsQuery } from '$lib/features/subnets/queries';
 	import { useApiKeysQuery } from '$lib/features/daemon_api_keys/queries';
 	import type { TagProps } from '$lib/shared/components/data/types';
+	import { entityRef } from '$lib/shared/components/data/types';
 	import DaemonUpgradeModal from './DaemonUpgradeModal.svelte';
 	import TagPickerInline from '$lib/features/tags/components/TagPickerInline.svelte';
 	import { modalState, openModal, closeModal } from '$lib/shared/stores/modal-registry';
@@ -169,13 +170,12 @@
 						? daemon.capabilities.interfaced_subnet_ids
 								.map((s) => subnetsData.find((subnet) => subnet.id == s))
 								.filter((s) => s != undefined)
-								.map((s) => {
-									return {
-										id: s.id,
-										label: s.name,
-										color: entities.getColorHelper('Subnet').color
-									};
-								})
+								.map((s) => ({
+									id: s.id,
+									label: s.name,
+									color: entities.getColorHelper('Subnet').color,
+									entityRef: entityRef('Subnet', s.id, s)
+								}))
 						: [
 								{
 									id: daemon.id,
