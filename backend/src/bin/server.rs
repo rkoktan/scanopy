@@ -233,15 +233,6 @@ async fn main() -> anyhow::Result<()> {
         HeaderValue::from_static("strict-origin-when-cross-origin"),
     );
 
-    // Clickjacking protection - prevents the app from being embedded in iframes
-    // Share endpoints override this with their own frame-ancestors based on allowed_domains
-    let frame_ancestors = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("content-security-policy"),
-        HeaderValue::from_static("frame-ancestors 'self'"),
-    );
-
-    // CSP Report-Only: non-blocking header that logs violations to browser console.
-    // Used to identify what a full CSP would break before enforcing it.
     let img_src_domains: String = ALLOWED_LOGO_DOMAINS
         .iter()
         .map(|d| format!("https://{}", d))
@@ -259,8 +250,8 @@ async fn main() -> anyhow::Result<()> {
          form-action 'self'",
         img_src_domains
     );
-    let csp_report_only = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("content-security-policy-report-only"),
+    let csp = SetResponseHeaderLayer::if_not_present(
+        HeaderName::from_static("content-security-policy"),
         HeaderValue::try_from(csp_value).expect("Invalid CSP header value"),
     );
 
@@ -289,8 +280,7 @@ async fn main() -> anyhow::Result<()> {
             .layer(cache_headers)
             .layer(content_type_options)
             .layer(referrer_policy)
-            .layer(frame_ancestors)
-            .layer(csp_report_only),
+            .layer(csp),
     );
 
     // Add HSTS header when secure cookies are enabled (indicates HTTPS is in use)
