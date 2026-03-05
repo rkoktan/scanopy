@@ -8,6 +8,7 @@ export interface ModalState {
 	tab: string | null;
 	subEntityId: string | null;
 	returnUrl: string | null;
+	returnTitle: string | null;
 }
 
 const EMPTY_STATE: ModalState = {
@@ -15,7 +16,8 @@ const EMPTY_STATE: ModalState = {
 	id: null,
 	tab: null,
 	subEntityId: null,
-	returnUrl: null
+	returnUrl: null,
+	returnTitle: null
 };
 
 export const modalState = writable<ModalState>({ ...EMPTY_STATE });
@@ -25,14 +27,21 @@ export const modalState = writable<ModalState>({ ...EMPTY_STATE });
  */
 export function openModal(
 	name: string,
-	opts?: { id?: string; tab?: string; subEntityId?: string; returnUrl?: string }
+	opts?: {
+		id?: string;
+		tab?: string;
+		subEntityId?: string;
+		returnUrl?: string;
+		returnTitle?: string;
+	}
 ): void {
 	const state: ModalState = {
 		name,
 		id: opts?.id ?? null,
 		tab: opts?.tab ?? null,
 		subEntityId: opts?.subEntityId ?? null,
-		returnUrl: opts?.returnUrl ?? null
+		returnUrl: opts?.returnUrl ?? null,
+		returnTitle: opts?.returnTitle ?? null
 	};
 	modalState.set(state);
 	syncToUrl(state);
@@ -53,10 +62,22 @@ export function closeModal(): void {
 export function goBack(): void {
 	const current = get(modalState);
 	if (!current.returnUrl) return;
-	const url = current.returnUrl;
-	modalState.set({ ...EMPTY_STATE });
-	window.location.href = url;
-	initModalFromUrl();
+	const target = new URL(current.returnUrl);
+
+	// Set hash (triggers tab reactivity)
+	window.location.hash = target.hash || '';
+
+	// Restore modal state from return URL, or clear if no modal
+	const modalName = target.searchParams.get('modal');
+	if (modalName) {
+		openModal(modalName, {
+			id: target.searchParams.get('id') ?? undefined,
+			tab: target.searchParams.get('tab') ?? undefined,
+			subEntityId: target.searchParams.get('subEntityId') ?? undefined
+		});
+	} else {
+		closeModal();
+	}
 }
 
 /**
@@ -83,7 +104,8 @@ export function initModalFromUrl(): void {
 		id: params.get('id'),
 		tab: params.get('tab'),
 		subEntityId: params.get('subEntityId'),
-		returnUrl: null
+		returnUrl: null,
+		returnTitle: null
 	};
 	modalState.set(state);
 }
@@ -100,12 +122,16 @@ export function navigateToEntity(
 	const config = entityUIConfig[entityType];
 	if (!config) return;
 
-	// Snapshot current URL before navigation so the back button can return here
+	// Snapshot current URL and modal title before navigation so the back button can return here
 	const returnUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+	const returnTitle =
+		typeof document !== 'undefined'
+			? (document.getElementById('modal-title')?.textContent ?? undefined)
+			: undefined;
 
 	if (config.modalName) {
 		window.location.hash = config.tabId;
-		openModal(config.modalName, { id: entityId, returnUrl });
+		openModal(config.modalName, { id: entityId, returnUrl, returnTitle });
 	} else if (config.parentType && config.parentIdField && data) {
 		const parentConfig = entityUIConfig[config.parentType];
 		const parentId = data[config.parentIdField] as string | undefined;
@@ -115,7 +141,8 @@ export function navigateToEntity(
 				id: parentId,
 				tab: config.modalTab,
 				subEntityId: entityId,
-				returnUrl
+				returnUrl,
+				returnTitle
 			});
 		}
 	} else {
