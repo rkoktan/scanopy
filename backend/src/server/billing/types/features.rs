@@ -1,5 +1,4 @@
 use crate::server::billing::types::base::BillingPlanDiscriminants;
-use crate::server::billing::types::base::Hosting;
 use crate::server::shared::types::metadata::EntityMetadataProvider;
 use crate::server::shared::types::metadata::HasId;
 use crate::server::shared::types::metadata::TypeMetadataProvider;
@@ -8,8 +7,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::Display;
 use strum::EnumIter;
-use strum::IntoDiscriminant;
-use strum::IntoEnumIterator;
 use strum::IntoStaticStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize, EnumIter, IntoStaticStr, Display, Default)]

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::hash::Hash;
 use stripe_product::price::CreatePriceRecurringInterval;
-use strum::{Display, EnumDiscriminants, EnumIter, IntoDiscriminant, IntoEnumIterator, IntoStaticStr};
+use strum::{Display, EnumDiscriminants, EnumIter, IntoDiscriminant, IntoStaticStr};
 use utoipa::ToSchema;
 
 #[derive(
@@ -292,7 +292,7 @@ impl BillingPlan {
         if idx == 0 {
             return None;
         }
-        Some(cloud_plans[idx - 1])
+        Some(cloud_tiers[idx - 1])
     }
 
     /// Returns feature IDs added by this plan over its previous tier.
