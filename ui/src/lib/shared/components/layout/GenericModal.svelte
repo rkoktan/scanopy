@@ -77,6 +77,9 @@
 	let showBackButton = $derived(
 		name != null && $modalState.name === name && $modalState.returnUrl != null
 	);
+	let returnTitle = $derived(
+		name != null && $modalState.name === name ? $modalState.returnTitle : null
+	);
 
 	// Track previous open state to detect open transition
 	let wasOpen = $state(false);
@@ -124,10 +127,16 @@
 			}
 
 			if (name) {
-				// Read subEntityId and returnUrl before openModal clears them
+				// Read subEntityId, returnUrl, returnTitle before openModal clears them
 				const subEntityId = state.name === name ? state.subEntityId : null;
 				const returnUrl = state.name === name ? (state.returnUrl ?? undefined) : undefined;
-				openModal(name, { id: entityId, tab: activeTab || undefined, returnUrl });
+				const savedReturnTitle = state.name === name ? (state.returnTitle ?? undefined) : undefined;
+				openModal(name, {
+					id: entityId,
+					tab: activeTab || undefined,
+					returnUrl,
+					returnTitle: savedReturnTitle
+				});
 				if (subEntityId && onSubEntityNavigation) {
 					onSubEntityNavigation(subEntityId);
 				}
@@ -191,6 +200,19 @@
 		onkeydown={(e) => e.key === 'Escape' && handleClose()}
 		tabindex="-1"
 	>
+		<!-- Floating back button (upper-left of viewport, over backdrop) -->
+		{#if showBackButton}
+			<button
+				type="button"
+				onclick={() => goBack()}
+				class="fixed left-6 top-6 z-50 flex items-center gap-2 rounded-full bg-gray-800/80 py-2 pl-2 pr-4 text-sm text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+				aria-label={returnTitle ? `Back to ${returnTitle}` : 'Go back'}
+			>
+				<ArrowLeft class="h-5 w-5" />
+				<span class="max-w-48 truncate">{returnTitle ? `Back to ${returnTitle}` : 'Back'}</span>
+			</button>
+		{/if}
+
 		<!-- Floating close button (absolute positioned, top-right of viewport) -->
 		{#if floatingCloseButton && onClose}
 			<button
@@ -225,16 +247,6 @@
 							</h2>
 						{:else}
 							<div class="flex items-center gap-3">
-								{#if showBackButton}
-									<button
-										type="button"
-										onclick={() => goBack()}
-										class="btn-icon"
-										aria-label="Go back"
-									>
-										<ArrowLeft class="h-5 w-5" />
-									</button>
-								{/if}
 								{@render headerIcon?.()}
 								<h2 id="modal-title" class="text-primary text-xl font-semibold">
 									{title}
