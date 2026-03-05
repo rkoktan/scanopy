@@ -75,7 +75,6 @@ impl Feature {
             BillingPlanDiscriminants::Free,
             BillingPlanDiscriminants::Starter,
             BillingPlanDiscriminants::Pro,
-            BillingPlanDiscriminants::Team,
             BillingPlanDiscriminants::Business,
             BillingPlanDiscriminants::Enterprise,
         ];
