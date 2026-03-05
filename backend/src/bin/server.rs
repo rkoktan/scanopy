@@ -245,6 +245,7 @@ async fn main() -> anyhow::Result<()> {
          img-src 'self' data: blob: {}; \
          font-src 'self'; \
          connect-src 'self' https://ph.scanopy.net; \
+         frame-src 'self' https://demo.scanopy.net; \
          frame-ancestors 'self'; \
          base-uri 'self'; \
          form-action 'self'",
