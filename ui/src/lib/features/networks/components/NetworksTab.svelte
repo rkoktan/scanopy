@@ -1,6 +1,5 @@
 <script lang="ts">
 	import TabHeader from '$lib/shared/components/layout/TabHeader.svelte';
-	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import Loading from '$lib/shared/components/feedback/Loading.svelte';
 	import EmptyState from '$lib/shared/components/layout/EmptyState.svelte';
 	import type { Network } from '../types';
@@ -198,7 +197,13 @@
 		<svelte:fragment slot="actions">
 			<div class="flex items-center gap-3">
 				{#if networkLimit !== null}
-					<span class="text-sm {isAtNetworkLimit ? 'text-amber-400' : 'text-tertiary'}">
+					<span
+						class="text-sm {isAtNetworkLimit
+							? 'text-amber-400'
+							: isNearNetworkLimit
+								? 'text-yellow-400'
+								: 'text-tertiary'}"
+					>
 						{networksData.length} / {networkLimit}
 					</span>
 				{/if}
@@ -206,6 +211,9 @@
 					{#if isAtNetworkLimit}
 						<UpgradeButton feature="networks" />
 					{:else}
+						{#if isNearNetworkLimit}
+							<UpgradeButton feature="more networks" />
+						{/if}
 						<button class="btn-primary flex items-center" onclick={handleCreateNetwork}
 							><Plus class="h-5 w-5" />{common_create()}</button
 						>
@@ -214,18 +222,6 @@
 			</div>
 		</svelte:fragment>
 	</TabHeader>
-
-	{#if isNearNetworkLimit}
-		<div class="flex items-center gap-3">
-			<div class="flex-1">
-				<InlineWarning
-					title="You're approaching your network limit ({networksData.length}/{networkLimit})."
-					dismissableKey="network-limit-warning"
-				/>
-			</div>
-			<UpgradeButton feature="more networks" />
-		</div>
-	{/if}
 
 	<!-- Loading state -->
 	{#if isLoading}
