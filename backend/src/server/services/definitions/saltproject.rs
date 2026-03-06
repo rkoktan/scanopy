@@ -5,7 +5,7 @@ use crate::server::services::r#impl::definitions::ServiceDefinition;
 use crate::server::services::r#impl::patterns::Pattern;
 
 #[derive(Default, Clone, Eq, PartialEq, Hash)]
-pub struct Salt-Project;
+pub struct SaltProject;
 
 impl ServiceDefinition for Salt Project {
     fn name(&self) -> &'static str {
