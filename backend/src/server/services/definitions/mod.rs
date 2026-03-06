@@ -70,6 +70,7 @@ pub mod snmp;
 pub mod ssh;
 pub mod switch;
 pub mod telnet;
+pub mod saltproject;
 
 // NetworkAccess
 pub mod access_point;
