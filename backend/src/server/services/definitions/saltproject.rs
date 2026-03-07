@@ -7,7 +7,7 @@ use crate::server::services::r#impl::patterns::Pattern;
 #[derive(Default, Clone, Eq, PartialEq, Hash)]
 pub struct SaltProject;
 
-impl ServiceDefinition for Salt Project {
+impl ServiceDefinition for saltproject {
     fn name(&self) -> &'static str {
         "Salt Project"
     }
@@ -31,4 +31,4 @@ impl ServiceDefinition for Salt Project {
     }
 }
 
-inventory::submit!(ServiceDefinitionFactory::new(create_service::<Salt Project>));
+inventory::submit!(ServiceDefinitionFactory::new(create_service::<SaltProject>));
